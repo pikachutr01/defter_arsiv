@@ -1,0 +1,185 @@
+import fs from 'fs'
+import path from 'path'
+import bcrypt from 'bcryptjs'
+import Database from 'better-sqlite3'
+
+const schemaSql = `
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS books (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    description     TEXT,
+  book_notes      TEXT,
+    total_pages     INTEGER NOT NULL DEFAULT 0,
+    cover_image     TEXT,
+    storage_folder  TEXT,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pages (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id         INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    page_number     INTEGER NOT NULL,
+  page_notes      TEXT,
+    side_a_image    TEXT,
+    side_a_notes    TEXT,
+    side_a_uploaded INTEGER DEFAULT 0,
+    side_b_image    TEXT,
+    side_b_notes    TEXT,
+    side_b_uploaded INTEGER DEFAULT 0,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(book_id, page_number)
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
+    side_a_notes,
+    side_b_notes,
+  page_notes,
+    content='pages',
+    content_rowid='id'
+);
+
+CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
+  INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes)
+  VALUES (new.id, new.side_a_notes, new.side_b_notes, new.page_notes);
+END;
+
+CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
+  INSERT INTO pages_fts(pages_fts, rowid, side_a_notes, side_b_notes, page_notes)
+  VALUES ('delete', old.id, old.side_a_notes, old.side_b_notes, old.page_notes);
+  INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes)
+  VALUES (new.id, new.side_a_notes, new.side_b_notes, new.page_notes);
+END;
+
+CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
+  INSERT INTO pages_fts(pages_fts, rowid, side_a_notes, side_b_notes, page_notes)
+  VALUES ('delete', old.id, old.side_a_notes, old.side_b_notes, old.page_notes);
+END;
+
+CREATE INDEX IF NOT EXISTS idx_pages_book_id ON pages(book_id);
+CREATE INDEX IF NOT EXISTS idx_pages_book_page ON pages(book_id, page_number);
+`
+
+let dbInstance = null
+
+export const initDb = (dbPath) => {
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true })
+  dbInstance = new Database(dbPath)
+  dbInstance.pragma('journal_mode = WAL')
+  dbInstance.exec(schemaSql)
+  ensureSchemaUpdates(dbInstance)
+  return dbInstance
+}
+
+export const getDb = () => {
+  if (!dbInstance) {
+    throw new Error('Database not initialized')
+  }
+  return dbInstance
+}
+
+export const getSetting = (key) => {
+  const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key)
+  return row ? row.value : null
+}
+
+export const setSetting = (key, value) => {
+  getDb()
+    .prepare(
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    )
+    .run(key, value)
+}
+
+export const ensureDefaults = (userDataRoot) => {
+  if (!getSetting('auth_username')) {
+    setSetting('auth_username', 'admin')
+  }
+  if (!getSetting('auth_password_hash')) {
+    const hash = bcrypt.hashSync('1234', 10)
+    setSetting('auth_password_hash', hash)
+  }
+  if (!getSetting('storage_path')) {
+    const storagePath = path.join(userDataRoot, 'images')
+    setSetting('storage_path', storagePath)
+  }
+}
+
+export const ensureStorageFolders = (storagePath) => {
+  fs.mkdirSync(storagePath, { recursive: true })
+  fs.mkdirSync(path.join(storagePath, 'covers'), { recursive: true })
+  fs.mkdirSync(path.join(storagePath, 'books'), { recursive: true })
+}
+
+const ensureColumn = (db, tableName, columnName, columnType) => {
+  const columns = db
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all()
+    .map((column) => column.name)
+  if (!columns.includes(columnName)) {
+    db.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnType}`).run()
+  }
+}
+
+const rebuildFts = (db) => {
+  db.exec(`
+    DROP TRIGGER IF EXISTS pages_ai;
+    DROP TRIGGER IF EXISTS pages_au;
+    DROP TRIGGER IF EXISTS pages_ad;
+    DROP TABLE IF EXISTS pages_fts;
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
+      side_a_notes,
+      side_b_notes,
+      page_notes,
+      content='pages',
+      content_rowid='id'
+    );
+
+    CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
+        INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes)
+        VALUES (new.id, new.side_a_notes, new.side_b_notes, new.page_notes);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
+        INSERT INTO pages_fts(pages_fts, rowid, side_a_notes, side_b_notes, page_notes)
+        VALUES ('delete', old.id, old.side_a_notes, old.side_b_notes, old.page_notes);
+        INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes)
+        VALUES (new.id, new.side_a_notes, new.side_b_notes, new.page_notes);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
+        INSERT INTO pages_fts(pages_fts, rowid, side_a_notes, side_b_notes, page_notes)
+        VALUES ('delete', old.id, old.side_a_notes, old.side_b_notes, old.page_notes);
+    END;
+  `)
+
+  db.prepare(
+    'INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes) SELECT id, side_a_notes, side_b_notes, page_notes FROM pages'
+  ).run()
+}
+
+const ensureSchemaUpdates = (db) => {
+  ensureColumn(db, 'books', 'book_notes', 'TEXT')
+  ensureColumn(db, 'pages', 'page_notes', 'TEXT')
+
+  let ftsColumns = []
+  try {
+    ftsColumns = db
+      .prepare('PRAGMA table_info(pages_fts)')
+      .all()
+      .map((column) => column.name)
+  } catch (error) {
+    ftsColumns = []
+  }
+
+  if (!ftsColumns.includes('page_notes')) {
+    rebuildFts(db)
+  }
+}

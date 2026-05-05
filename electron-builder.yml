@@ -1,0 +1,15 @@
+appId: com.personal.cilt-dijital-kayit-sistemi
+productName: Cilt Dijital Kayıt Sistemi
+win:
+  target: nsis
+  icon: assets/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+files:
+  - dist/**/*
+  - electron/**/*
+  - node_modules/**/*
+extraResources:
+  - from: assets/
+    to: assets/
