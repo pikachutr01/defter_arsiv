@@ -67,7 +67,7 @@ export default function BookForm({ book = null, onClose, onSubmit }) {
     <Modal
       title={book ? 'Cildi Düzenle' : 'Yeni Cilt'}
       onClose={onClose}
-      panelClassName="max-w-6xl"
+      panelClassName="max-w-[85vw]"
     >
       <form className="grid gap-8 lg:grid-cols-[1.45fr_1fr]" onSubmit={handleSubmit}>
         <div className="flex flex-col gap-4">

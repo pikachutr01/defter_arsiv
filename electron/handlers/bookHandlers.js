@@ -5,6 +5,10 @@ import { dialog } from 'electron'
 
 const COVER_MAX_SIZE = 1600
 const COVER_QUALITY = 80
+const bookNameCollator = new Intl.Collator('tr', {
+  numeric: true,
+  sensitivity: 'base',
+})
 
 const getStoragePath = (db) =>
   db.prepare('SELECT value FROM settings WHERE key = ?').get('storage_path')
@@ -81,6 +85,7 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
       const rows = db
         .prepare('SELECT * FROM books ORDER BY created_at DESC')
         .all()
+        .sort((left, right) => bookNameCollator.compare(left.name || '', right.name || ''))
       return { success: true, data: rows }
     } catch (error) {
       return { success: false, error: error.message }

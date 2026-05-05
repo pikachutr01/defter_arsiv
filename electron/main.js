@@ -78,7 +78,7 @@ const setupApp = () => {
   registerBookHandlers({ ipcMain, db })
   registerPageHandlers({ ipcMain, db })
   registerImageHandlers({ ipcMain, db })
-  registerPdfHandlers({ ipcMain, db })
+  registerPdfHandlers({ ipcMain, db, app })
   registerSearchHandlers({ ipcMain, db })
   registerSettingsHandlers({ ipcMain, db, app })
   registerArchiveHandlers({ ipcMain, db })

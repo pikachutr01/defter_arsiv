@@ -12,7 +12,11 @@ export const registerPageHandlers = ({ ipcMain, db }) => {
 
   ipcMain.handle('pages:getById', (_event, id) => {
     try {
-      const row = db.prepare('SELECT * FROM pages WHERE id = ?').get(id)
+      const row = db
+        .prepare(
+          'SELECT pages.*, books.name AS book_name FROM pages JOIN books ON pages.book_id = books.id WHERE pages.id = ?'
+        )
+        .get(id)
       return { success: true, data: row }
     } catch (error) {
       return { success: false, error: error.message }

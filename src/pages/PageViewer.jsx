@@ -7,6 +7,7 @@ import ImageUploader from '../components/images/ImageUploader.jsx'
 import ImageViewer from '../components/images/ImageViewer.jsx'
 import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
+import usePdfQueueStore from '../store/usePdfQueueStore.js'
 
 function PageImagePanel({
   side,
@@ -20,6 +21,8 @@ function PageImagePanel({
   onOpenViewer,
   onReveal,
   onFileDrop,
+  onTogglePdf,
+  isSelectedForPdf,
   storagePath,
 }) {
   const imageUrl = toLocalAssetUrl(storagePath, imagePath)
@@ -79,6 +82,17 @@ function PageImagePanel({
           <div className="flex flex-wrap gap-2 border-t border-[var(--border)] px-4 py-3">
             <button
               type="button"
+              onClick={onTogglePdf}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                isSelectedForPdf
+                  ? 'border border-[var(--accent)] bg-[var(--accent)] text-white shadow-[0_12px_24px_rgba(54,111,224,0.28)]'
+                  : 'border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--accent)]'
+              }`}
+            >
+              {isSelectedForPdf ? "PDF'den Çıkar" : "PDF'e Ekle"}
+            </button>
+            <button
+              type="button"
               onClick={onUpload}
               className="rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)]"
             >
@@ -136,6 +150,8 @@ export default function PageViewer() {
   const [pendingDeleteSide, setPendingDeleteSide] = useState(null)
   const [isSavingNotes, setIsSavingNotes] = useState(false)
   const storagePath = useSettingsStore((state) => state.storagePath)
+  const togglePdfItem = usePdfQueueStore((state) => state.toggleItem)
+  const pdfItems = usePdfQueueStore((state) => state.items)
   const { showToast } = useToast()
 
   const syncPageState = useCallback((data) => {
@@ -324,6 +340,21 @@ export default function PageViewer() {
           onOpenViewer={() => setViewerSide('A')}
           onReveal={() => handleRevealImage(page?.side_a_image)}
           onFileDrop={(filePath) => runImageUpload('A', filePath)}
+          onTogglePdf={() => {
+            if (!page?.side_a_image) return
+
+            togglePdfItem({
+              pageId: numericId,
+              side: 'A',
+              imagePath: page.side_a_image,
+              pageNumber: page.page_number,
+              bookId: page.book_id,
+              bookName: page.book_name || '',
+            })
+          }}
+          isSelectedForPdf={pdfItems.some(
+            (item) => item.pageId === numericId && item.side === 'A'
+          )}
           storagePath={storagePath}
         />
         <PageImagePanel
@@ -340,6 +371,21 @@ export default function PageViewer() {
           onOpenViewer={() => setViewerSide('B')}
           onReveal={() => handleRevealImage(page?.side_b_image)}
           onFileDrop={(filePath) => runImageUpload('B', filePath)}
+          onTogglePdf={() => {
+            if (!page?.side_b_image) return
+
+            togglePdfItem({
+              pageId: numericId,
+              side: 'B',
+              imagePath: page.side_b_image,
+              pageNumber: page.page_number,
+              bookId: page.book_id,
+              bookName: page.book_name || '',
+            })
+          }}
+          isSelectedForPdf={pdfItems.some(
+            (item) => item.pageId === numericId && item.side === 'B'
+          )}
           storagePath={storagePath}
         />
       </div>

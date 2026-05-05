@@ -43,7 +43,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     query: (text, bookId) => ipcRenderer.invoke('search:query', text, bookId),
   },
   pdf: {
-    generate: (selections) => ipcRenderer.invoke('pdf:generate', selections),
+    generate: (payload) => ipcRenderer.invoke('pdf:generate', payload),
+    list: () => ipcRenderer.invoke('pdf:list'),
+    open: (filePath) => ipcRenderer.invoke('pdf:open', filePath),
   },
   settings: {
     get: (key) => ipcRenderer.invoke('settings:get', key),
