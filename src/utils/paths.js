@@ -9,3 +9,10 @@ export const resolveStoredPath = (storagePath, storedPath) => {
   const tail = normalize(storedPath).replace(/^\/+/, '')
   return `${base}/${tail}`
 }
+
+export const toLocalAssetUrl = (storagePath, storedPath) => {
+  const resolvedPath = resolveStoredPath(storagePath, storedPath)
+  if (!resolvedPath) return null
+
+  return `local-file://asset?path=${encodeURIComponent(resolvedPath)}`
+}

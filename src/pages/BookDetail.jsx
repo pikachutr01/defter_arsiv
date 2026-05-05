@@ -5,6 +5,9 @@ import usePageStore from '../store/usePageStore.js'
 import PageGrid from '../components/pages/PageGrid.jsx'
 import EmptyState from '../components/shared/EmptyState.jsx'
 import { ipc } from '../utils/ipc.js'
+import BookForm from '../components/books/BookForm.jsx'
+import { useToast } from '../components/shared/ToastProvider.jsx'
+import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
 
 export default function BookDetail() {
   const { id } = useParams()
@@ -12,11 +15,30 @@ export default function BookDetail() {
   const bookId = Number(id)
   const books = useBookStore((state) => state.books)
   const updateBook = useBookStore((state) => state.updateBook)
-  const { pages, loadPagesByBook } = usePageStore((state) => ({
-    pages: state.pages,
-    loadPagesByBook: state.loadPagesByBook,
-  }))
+  const deleteBook = useBookStore((state) => state.deleteBook)
+  const pages = usePageStore((state) => state.pages)
+  const loadPagesByBook = usePageStore((state) => state.loadPagesByBook)
   const [filter, setFilter] = useState('all')
+  const [fetchedBook, setFetchedBook] = useState(null)
+  const [bookNotesDraft, setBookNotesDraft] = useState('')
+  const [hasBookNotesDraft, setHasBookNotesDraft] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const { showToast } = useToast()
+
+  const cachedBook = useMemo(
+    () => books.find((item) => item.id === bookId) || null,
+    [bookId, books]
+  )
+
+  const book =
+    cachedBook?.id === bookId
+      ? cachedBook
+      : fetchedBook?.id === bookId
+        ? fetchedBook
+        : null
+
+  const bookNotes = hasBookNotesDraft ? bookNotesDraft : book?.book_notes || ''
 
   useEffect(() => {
     if (bookId) {
@@ -24,25 +46,26 @@ export default function BookDetail() {
     }
   }, [bookId, loadPagesByBook])
 
-  const [book, setBook] = useState(null)
-  const [bookNotes, setBookNotes] = useState('')
-
   useEffect(() => {
-    const cached = books.find((item) => item.id === bookId)
-    if (cached) {
-      setBook(cached)
-      setBookNotes(cached.book_notes || '')
+    if (!bookId || cachedBook) {
       return
     }
+
+    let isMounted = true
+
     const loadBook = async () => {
       const result = await ipc.booksGetById(bookId)
-      if (result.success) {
-        setBook(result.data)
-        setBookNotes(result.data?.book_notes || '')
+      if (isMounted && result.success) {
+        setFetchedBook(result.data)
       }
     }
+
     loadBook()
-  }, [bookId, books])
+
+    return () => {
+      isMounted = false
+    }
+  }, [bookId, cachedBook])
 
   const handleSaveNotes = async () => {
     if (!book) return
@@ -51,11 +74,75 @@ export default function BookDetail() {
       description: book.description,
       total_pages: book.total_pages,
       book_notes: bookNotes,
+      cover_source_path: null,
+      remove_cover: false,
     }
     const result = await updateBook(bookId, payload)
     if (result?.success) {
-      setBook(result.data)
+      setFetchedBook(result.data)
+      setBookNotesDraft('')
+      setHasBookNotesDraft(false)
+      showToast({
+        variant: 'success',
+        title: 'Notlar kaydedildi',
+        message: 'Cilt notu başarıyla güncellendi.',
+      })
+      return
     }
+
+    showToast({
+      variant: 'danger',
+      title: 'Kayıt başarısız',
+      message: result?.error || 'Cilt notu kaydedilemedi.',
+    })
+  }
+
+  const handleUpdateBook = async (payload) => {
+    const result = await updateBook(bookId, payload)
+    if (result.success) {
+      setFetchedBook(result.data)
+      setShowEditForm(false)
+      setBookNotesDraft('')
+      setHasBookNotesDraft(false)
+      showToast({
+        variant: 'success',
+        title: 'Cilt güncellendi',
+        message: 'Cilt bilgileri başarıyla güncellendi.',
+      })
+      return
+    }
+
+    showToast({
+      variant: 'danger',
+      title: 'Güncelleme başarısız',
+      message: result.error || 'Cilt bilgileri güncellenemedi.',
+    })
+  }
+
+  const handleDeleteBook = async () => {
+    if (!book) {
+      return
+    }
+
+    const bookName = book.name
+    const result = await deleteBook(bookId)
+    setShowDeleteConfirm(false)
+
+    if (result.success) {
+      showToast({
+        variant: 'success',
+        title: 'Cilt silindi',
+        message: `${bookName} arşivden kaldırıldı.`,
+      })
+      navigate('/')
+      return
+    }
+
+    showToast({
+      variant: 'danger',
+      title: 'Cilt silinemedi',
+      message: result.error || 'Cilt silinirken beklenmeyen bir hata oluştu.',
+    })
   }
 
   const filteredPages = useMemo(() => {
@@ -81,7 +168,21 @@ export default function BookDetail() {
             Sayfaları düzenle ve fotoğrafları yükle.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setShowEditForm(true)}
+            className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs text-[var(--text-primary)] transition hover:border-[var(--accent)]"
+          >
+            Cildi Düzenle
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="rounded-lg border border-[var(--danger-border)] px-4 py-2 text-xs text-[var(--text-primary)] transition hover:border-[var(--danger-strong)]"
+          >
+            Cildi Sil
+          </button>
           {['all', 'with', 'missing'].map((value) => (
             <button
               key={value}
@@ -89,7 +190,7 @@ export default function BookDetail() {
               onClick={() => setFilter(value)}
               className={`rounded-lg px-4 py-2 text-xs transition ${
                 filter === value
-                  ? 'bg-[var(--accent-dim)] text-white'
+                  ? 'bg-[var(--accent-dim)] text-[var(--text-primary)]'
                   : 'border border-[var(--border)] text-[var(--text-muted)]'
               }`}
             >
@@ -116,7 +217,10 @@ export default function BookDetail() {
         </div>
         <textarea
           value={bookNotes}
-          onChange={(event) => setBookNotes(event.target.value)}
+          onChange={(event) => {
+            setBookNotesDraft(event.target.value)
+            setHasBookNotesDraft(true)
+          }}
           rows={4}
           placeholder="Cilde özel not"
           className="mt-3 w-full rounded-xl border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)]"
@@ -134,6 +238,23 @@ export default function BookDetail() {
           onSelect={(page) => navigate(`/books/${bookId}/pages/${page.id}`)}
         />
       )}
+
+      {showEditForm && book ? (
+        <BookForm
+          book={book}
+          onClose={() => setShowEditForm(false)}
+          onSubmit={handleUpdateBook}
+        />
+      ) : null}
+
+      {showDeleteConfirm && book ? (
+        <ConfirmDialog
+          title="Cildi Sil"
+          message={`${book.name} ve ona bağlı tüm sayfalar silinecek. Devam etmek istiyor musun?`}
+          onCancel={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDeleteBook}
+        />
+      ) : null}
     </section>
   )
 }

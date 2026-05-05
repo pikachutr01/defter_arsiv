@@ -1,15 +1,15 @@
 import useSettingsStore from '../../store/useSettingsStore.js'
-import { resolveStoredPath } from '../../utils/paths.js'
+import { toLocalAssetUrl } from '../../utils/paths.js'
 
 export default function BookCover({ coverPath, title }) {
   const storagePath = useSettingsStore((state) => state.storagePath)
-  const resolvedPath = resolveStoredPath(storagePath, coverPath)
+  const imageUrl = toLocalAssetUrl(storagePath, coverPath)
 
   return (
     <div className="relative h-44 w-full overflow-hidden bg-[var(--bg-elevated)]">
-      {resolvedPath ? (
+      {imageUrl ? (
         <img
-          src={`file://${resolvedPath}`}
+          src={imageUrl}
           alt={title}
           className="h-full w-full object-cover"
         />

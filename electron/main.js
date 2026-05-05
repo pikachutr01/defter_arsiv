@@ -1,8 +1,13 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, net, protocol } from 'electron'
 import path from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import fs from 'fs'
-import { ensureDefaults, ensureStorageFolders, getSetting, initDb } from './db.js'
+import {
+  ensureDefaults,
+  ensureStorageFolders,
+  getSetting,
+  initDb,
+} from './db.js'
 import { registerAuthHandlers } from './handlers/authHandlers.js'
 import { registerBookHandlers } from './handlers/bookHandlers.js'
 import { registerPageHandlers } from './handlers/pageHandlers.js'
@@ -17,6 +22,18 @@ const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
 
+const registerLocalAssetProtocol = () => {
+  protocol.handle('local-file', (request) => {
+    const filePath = new URL(request.url).searchParams.get('path')
+
+    if (!filePath) {
+      return new Response('Missing file path.', { status: 400 })
+    }
+
+    return net.fetch(pathToFileURL(filePath).toString())
+  })
+}
+
 const createMainWindow = () => {
   const win = new BrowserWindow({
     width: 1280,
@@ -24,10 +41,8 @@ const createMainWindow = () => {
     minWidth: 1024,
     minHeight: 600,
     title: 'Cilt Dijital Kayıt Sistemi',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -50,7 +65,10 @@ const setupApp = () => {
   const dbPath = path.join(userDataRoot, 'database.sqlite')
   const db = initDb(dbPath)
 
-  ensureDefaults(userDataRoot)
+  ensureDefaults({
+    userDataRoot,
+    documentsRoot: app.getPath('documents'),
+  })
   const storagePath = getSetting('storage_path')
   if (storagePath) {
     ensureStorageFolders(storagePath)
@@ -62,11 +80,12 @@ const setupApp = () => {
   registerImageHandlers({ ipcMain, db })
   registerPdfHandlers({ ipcMain, db })
   registerSearchHandlers({ ipcMain, db })
-  registerSettingsHandlers({ ipcMain, db })
+  registerSettingsHandlers({ ipcMain, db, app })
   registerArchiveHandlers({ ipcMain, db })
 }
 
 app.whenReady().then(() => {
+  registerLocalAssetProtocol()
   setupApp()
   createMainWindow()
 

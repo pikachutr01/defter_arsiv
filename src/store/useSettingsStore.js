@@ -17,7 +17,14 @@ const useSettingsStore = create((set) => ({
   setStoragePath: async (value) => {
     const result = await ipc.settingsSetStoragePath(value)
     if (result.success) {
-      set({ storagePath: value })
+      set({ storagePath: result.data || value })
+    }
+    return result
+  },
+  chooseStoragePath: async () => {
+    const result = await ipc.settingsChooseStoragePath()
+    if (result.success) {
+      set({ storagePath: result.data || '' })
     }
     return result
   },

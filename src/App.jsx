@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { useEffect } from 'react'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import Sidebar from './components/layout/Sidebar.jsx'
@@ -11,6 +11,7 @@ import Search from './pages/Search.jsx'
 import PdfExport from './pages/PdfExport.jsx'
 import Settings from './pages/Settings.jsx'
 import useSettingsStore from './store/useSettingsStore.js'
+import useThemeStore from './store/useThemeStore.js'
 
 function AppLayout() {
   const fetchStoragePath = useSettingsStore((state) => state.fetchStoragePath)
@@ -26,15 +27,7 @@ function AppLayout() {
         <div className="flex-1">
           <TopBar />
           <main className="px-8 pb-12 pt-6">
-            <Routes>
-              <Route index element={<Dashboard />} />
-              <Route path="books/:id" element={<BookDetail />} />
-              <Route path="books/:id/pages/:pageId" element={<PageViewer />} />
-              <Route path="search" element={<Search />} />
-              <Route path="pdf-export" element={<PdfExport />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            <Outlet />
           </main>
         </div>
       </div>
@@ -43,11 +36,25 @@ function AppLayout() {
 }
 
 export default function App() {
+  const initializeTheme = useThemeStore((state) => state.initializeTheme)
+
+  useEffect(() => {
+    initializeTheme()
+  }, [initializeTheme])
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute />}>
-        <Route path="/*" element={<AppLayout />} />
+        <Route element={<AppLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="books/:id" element={<BookDetail />} />
+          <Route path="books/:id/pages/:pageId" element={<PageViewer />} />
+          <Route path="search" element={<Search />} />
+          <Route path="pdf-export" element={<PdfExport />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Route>
     </Routes>
   )

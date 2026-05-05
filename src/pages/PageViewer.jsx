@@ -1,103 +1,361 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import useSettingsStore from '../store/useSettingsStore.js'
 import { ipc } from '../utils/ipc.js'
-import { resolveStoredPath } from '../utils/paths.js'
+import { toLocalAssetUrl } from '../utils/paths.js'
 import ImageUploader from '../components/images/ImageUploader.jsx'
+import ImageViewer from '../components/images/ImageViewer.jsx'
+import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
+import { useToast } from '../components/shared/ToastProvider.jsx'
+
+function PageImagePanel({
+  side,
+  imagePath,
+  notesValue,
+  placeholderLabel,
+  notesPlaceholder,
+  onNotesChange,
+  onUpload,
+  onDelete,
+  onOpenViewer,
+  onReveal,
+  onFileDrop,
+  storagePath,
+}) {
+  const imageUrl = toLocalAssetUrl(storagePath, imagePath)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleDrop = async (event) => {
+    event.preventDefault()
+    setIsDragging(false)
+
+    const droppedFile = event.dataTransfer.files?.[0]
+    if (!droppedFile) {
+      return
+    }
+
+    const filePath = ipc.systemGetPathForFile(droppedFile)
+    if (!filePath) {
+      return
+    }
+
+    await onFileDrop(filePath)
+  }
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-lg">{side} Yüzü</h3>
+      {imageUrl ? (
+        <div
+          onDragOver={(event) => {
+            event.preventDefault()
+            setIsDragging(true)
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`overflow-hidden rounded-2xl border bg-[rgba(255,255,255,0.02)] transition ${
+            isDragging
+              ? 'border-[var(--accent)] ring-2 ring-[rgba(79,142,247,0.22)]'
+              : 'border-[var(--border)]'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={onOpenViewer}
+            className="group relative block h-[22rem] w-full bg-[var(--bg-elevated)]"
+          >
+            <img
+              src={imageUrl}
+              alt={`${side} yüzü`}
+              className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
+            />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-[rgba(7,11,18,0.92)] via-[rgba(7,11,18,0.28)] to-transparent px-4 py-3 text-xs text-white/85">
+              <span>Görseli büyüt</span>
+              <span className="rounded-full border border-white/20 px-2 py-1 text-[11px]">
+                Önizleme
+              </span>
+            </div>
+          </button>
+          <div className="flex flex-wrap gap-2 border-t border-[var(--border)] px-4 py-3">
+            <button
+              type="button"
+              onClick={onUpload}
+              className="rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)]"
+            >
+              Resmi Değiştir
+            </button>
+            <button
+              type="button"
+              onClick={onReveal}
+              className="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)]"
+            >
+              Klasörde Bul
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-surface-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--danger-strong)]"
+            >
+              Resmi Sil
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onDragOver={(event) => {
+            event.preventDefault()
+            setIsDragging(true)
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`rounded-2xl transition ${
+            isDragging ? 'ring-2 ring-[rgba(79,142,247,0.22)]' : ''
+          }`}
+        >
+          <ImageUploader label={placeholderLabel} onUpload={onUpload} />
+        </div>
+      )}
+      <textarea
+        value={notesValue}
+        onChange={onNotesChange}
+        rows={4}
+        placeholder={notesPlaceholder}
+        className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
+      />
+    </div>
+  )
+}
 
 export default function PageViewer() {
   const { pageId } = useParams()
+  const navigate = useNavigate()
   const numericId = Number(pageId)
   const [page, setPage] = useState(null)
   const [notes, setNotes] = useState({ a: '', b: '', page: '' })
+  const [viewerSide, setViewerSide] = useState(null)
+  const [pendingDeleteSide, setPendingDeleteSide] = useState(null)
+  const [isSavingNotes, setIsSavingNotes] = useState(false)
   const storagePath = useSettingsStore((state) => state.storagePath)
+  const { showToast } = useToast()
 
-  const loadPage = async () => {
+  const syncPageState = useCallback((data) => {
+    setPage(data)
+    setNotes({
+      a: data?.side_a_notes || '',
+      b: data?.side_b_notes || '',
+      page: data?.page_notes || '',
+    })
+  }, [])
+
+  const loadPage = useCallback(async () => {
     const result = await ipc.pagesGetById(numericId)
     if (result.success) {
-      setPage(result.data)
-      setNotes({
-        a: result.data?.side_a_notes || '',
-        b: result.data?.side_b_notes || '',
-        page: result.data?.page_notes || '',
+      syncPageState(result.data)
+    }
+    return result
+  }, [numericId, syncPageState])
+
+  useEffect(() => {
+    if (!numericId) {
+      return
+    }
+
+    let isMounted = true
+
+    const fetchPage = async () => {
+      const result = await ipc.pagesGetById(numericId)
+      if (isMounted && result.success) {
+        syncPageState(result.data)
+      }
+    }
+
+    fetchPage()
+
+    return () => {
+      isMounted = false
+    }
+  }, [numericId, syncPageState])
+
+  const runImageUpload = async (side, sourcePath = null) => {
+    const result = sourcePath
+      ? await ipc.imagesUpload(numericId, side, sourcePath)
+      : await ipc.imagesUploadFromDialog(numericId, side)
+
+    if (result.success) {
+      await loadPage()
+      showToast({
+        variant: 'success',
+        title: 'Görsel güncellendi',
+        message: `${side} yüzü görseli başarıyla kaydedildi.`,
+      })
+      return
+    }
+
+    if (result.error === 'Seçim iptal edildi.') {
+      return
+    }
+
+    showToast({
+      variant: 'danger',
+      title: 'Görsel yüklenemedi',
+      message: result.error || 'Görsel seçilirken beklenmeyen bir sorun oluştu.',
+    })
+  }
+
+  const handleDeleteImage = async () => {
+    if (!pendingDeleteSide) {
+      return
+    }
+
+    const side = pendingDeleteSide
+    const result = await ipc.imagesDelete(numericId, side)
+    setPendingDeleteSide(null)
+
+    if (result.success) {
+      await loadPage()
+      showToast({
+        variant: 'success',
+        title: 'Görsel silindi',
+        message: `${side} yüzüne ait görsel kaldırıldı.`,
+      })
+      return
+    }
+
+    showToast({
+      variant: 'danger',
+      title: 'Görsel silinemedi',
+      message: result.error || 'Görsel silinirken beklenmeyen bir hata oluştu.',
+    })
+  }
+
+  const handleRevealImage = async (imagePath) => {
+    if (!imagePath) {
+      return
+    }
+
+    const result = await ipc.imagesRevealInFolder(imagePath)
+    if (!result.success) {
+      showToast({
+        variant: 'danger',
+        title: 'Klasör açılamadı',
+        message: result.error || 'Görselin bulunduğu klasör açılamadı.',
       })
     }
   }
 
-  useEffect(() => {
-    if (numericId) {
-      loadPage()
-    }
-  }, [numericId])
-
-  const handleUpload = async (side) => {
-    await ipc.imagesUploadFromDialog(numericId, side)
-    await loadPage()
-  }
-
   const handleSaveNotes = async () => {
-    await ipc.pagesUpdate(numericId, {
+    setIsSavingNotes(true)
+
+    const result = await ipc.pagesUpdate(numericId, {
       page_notes: notes.page,
       side_a_notes: notes.a,
       side_b_notes: notes.b,
     })
-    await loadPage()
+
+    setIsSavingNotes(false)
+
+    if (result.success) {
+      syncPageState(result.data)
+      showToast({
+        variant: 'success',
+        title: 'Notlar kaydedildi',
+        message: 'Notlar kaydedildi.',
+      })
+      return
+    }
+
+    showToast({
+      variant: 'danger',
+      title: 'Kayıt başarısız',
+      message: result.error || 'Notlar kaydedilirken beklenmeyen bir hata oluştu.',
+    })
   }
+
+  const viewerImagePath =
+    viewerSide === 'A'
+      ? page?.side_a_image
+      : viewerSide === 'B'
+        ? page?.side_b_image
+        : null
 
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="text-2xl">
-          Sayfa Görüntüle {page?.page_number ? `#${page.page_number}` : ''}
-        </h2>
-        <p className="text-sm text-[var(--text-muted)]">
+        <div className="flex items-center gap-3">
+          {page?.book_id ? (
+            <button
+              type="button"
+              onClick={() => navigate(`/books/${page.book_id}`)}
+              className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] p-2 text-[var(--text-primary)] transition hover:border-[var(--accent)]"
+              title="Geri"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+                <path
+                  d="m15 6-6 6 6 6"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ) : null}
+          <h2 className="text-2xl">
+            Sayfa Görüntüle {page?.page_number ? `#${page.page_number}` : ''}
+          </h2>
+        </div>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">
           A ve B yüzlerini yan yana kontrol et.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-3">
-          <h3 className="text-lg">A Yüzü</h3>
-          {page?.side_a_image ? (
-            <img
-              src={`file://${resolveStoredPath(storagePath, page.side_a_image)}`}
-              alt="A yüzü"
-              className="w-full rounded-2xl border border-[var(--border)]"
-            />
-          ) : (
-            <ImageUploader label="A Yüzü Yükle" onUpload={() => handleUpload('A')} />
-          )}
-          <textarea
-            value={notes.a}
-            onChange={(event) => setNotes((prev) => ({ ...prev, a: event.target.value }))}
-            rows={4}
-            placeholder="A yüzü notu"
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
-          />
-        </div>
-        <div className="space-y-3">
-          <h3 className="text-lg">B Yüzü</h3>
-          {page?.side_b_image ? (
-            <img
-              src={`file://${resolveStoredPath(storagePath, page.side_b_image)}`}
-              alt="B yüzü"
-              className="w-full rounded-2xl border border-[var(--border)]"
-            />
-          ) : (
-            <ImageUploader label="B Yüzü Yükle" onUpload={() => handleUpload('B')} />
-          )}
-          <textarea
-            value={notes.b}
-            onChange={(event) => setNotes((prev) => ({ ...prev, b: event.target.value }))}
-            rows={4}
-            placeholder="B yüzü notu"
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
-          />
-        </div>
+        <PageImagePanel
+          side="A"
+          imagePath={page?.side_a_image}
+          notesValue={notes.a}
+          placeholderLabel="A Yüzü Yükle"
+          notesPlaceholder="A yüzü notu"
+          onNotesChange={(event) =>
+            setNotes((prev) => ({ ...prev, a: event.target.value }))
+          }
+          onUpload={() => runImageUpload('A')}
+          onDelete={() => setPendingDeleteSide('A')}
+          onOpenViewer={() => setViewerSide('A')}
+          onReveal={() => handleRevealImage(page?.side_a_image)}
+          onFileDrop={(filePath) => runImageUpload('A', filePath)}
+          storagePath={storagePath}
+        />
+        <PageImagePanel
+          side="B"
+          imagePath={page?.side_b_image}
+          notesValue={notes.b}
+          placeholderLabel="B Yüzü Yükle"
+          notesPlaceholder="B yüzü notu"
+          onNotesChange={(event) =>
+            setNotes((prev) => ({ ...prev, b: event.target.value }))
+          }
+          onUpload={() => runImageUpload('B')}
+          onDelete={() => setPendingDeleteSide('B')}
+          onOpenViewer={() => setViewerSide('B')}
+          onReveal={() => handleRevealImage(page?.side_b_image)}
+          onFileDrop={(filePath) => runImageUpload('B', filePath)}
+          storagePath={storagePath}
+        />
       </div>
 
       <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
-        <h3 className="text-lg">Sayfa Notu</h3>
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-lg">Sayfa Notu</h3>
+          <button
+            type="button"
+            onClick={handleSaveNotes}
+            disabled={isSavingNotes}
+            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-wait disabled:opacity-70"
+          >
+            {isSavingNotes ? 'Kaydediliyor...' : 'Notları Kaydet'}
+          </button>
+        </div>
         <textarea
           value={notes.page}
           onChange={(event) =>
@@ -109,13 +367,22 @@ export default function PageViewer() {
         />
       </div>
 
-      <button
-        type="button"
-        onClick={handleSaveNotes}
-        className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm text-white"
-      >
-        Notları Kaydet
-      </button>
+      {viewerImagePath ? (
+        <ImageViewer
+          title={`${viewerSide} Yüzü Görüntüle`}
+          imagePath={viewerImagePath}
+          onClose={() => setViewerSide(null)}
+        />
+      ) : null}
+
+      {pendingDeleteSide ? (
+        <ConfirmDialog
+          title="Görseli Sil"
+          message={`${pendingDeleteSide} yüzüne ait görsel kalıcı olarak silinecek. Devam etmek istiyor musun?`}
+          onCancel={() => setPendingDeleteSide(null)}
+          onConfirm={handleDeleteImage}
+        />
+      ) : null}
     </section>
   )
 }

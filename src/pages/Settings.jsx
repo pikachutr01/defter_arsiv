@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react'
 import useSettingsStore from '../store/useSettingsStore.js'
 import { ipc } from '../utils/ipc.js'
+import AlertMessage from '../components/shared/AlertMessage.jsx'
 
 export default function Settings() {
-  const { storagePath, fetchStoragePath, setStoragePath } = useSettingsStore(
-    (state) => ({
-      storagePath: state.storagePath,
-      fetchStoragePath: state.fetchStoragePath,
-      setStoragePath: state.setStoragePath,
-    })
-  )
-  const [storageInput, setStorageInput] = useState('')
+  const storagePath = useSettingsStore((state) => state.storagePath)
+  const fetchStoragePath = useSettingsStore((state) => state.fetchStoragePath)
+  const chooseStoragePath = useSettingsStore((state) => state.chooseStoragePath)
   const [credentials, setCredentials] = useState({
     currentPassword: '',
     newUsername: '',
@@ -25,44 +21,76 @@ export default function Settings() {
   }, [fetchStoragePath])
 
   useEffect(() => {
+    let isMounted = true
+
     const loadUsername = async () => {
       const result = await ipc.settingsGet('auth_username')
-      if (result.success) {
+      if (isMounted && result.success) {
         setCurrentUsername(result.data || '')
       }
     }
+
     loadUsername()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
-  useEffect(() => {
-    setStorageInput(storagePath || '')
-  }, [storagePath])
+  const handleChooseStoragePath = async () => {
+    const result = await chooseStoragePath()
+    if (result.canceled) {
+      return
+    }
 
-  const handleStorageChange = async () => {
-    const result = await setStoragePath(storageInput)
-    setStatus(result.success ? 'Depolama yolu güncellendi.' : result.error)
+    setStatus({
+      type: result.success ? 'success' : 'danger',
+      message: result.success
+        ? 'Depolama klasörü güncellendi.'
+        : result.error,
+    })
   }
 
   const handleCredentialChange = async (event) => {
     event.preventDefault()
     if (credentials.newPassword !== credentials.confirmPassword) {
-      setStatus('Yeni şifreler eşleşmiyor.')
+      setStatus({
+        type: 'danger',
+        message: 'Yeni şifreler eşleşmiyor.',
+      })
       return
     }
     if (credentials.newPassword.length < 4) {
-      setStatus('Şifre en az 4 karakter olmalı.')
+      setStatus({
+        type: 'danger',
+        message: 'Şifre en az 4 karakter olmalı.',
+      })
       return
     }
+
     const result = await ipc.authChange({
       currentPassword: credentials.currentPassword,
       newUsername: credentials.newUsername,
       newPassword: credentials.newPassword,
     })
+
     if (result.success) {
       setCurrentUsername(credentials.newUsername)
-      setStatus('Kimlik bilgileri güncellendi.')
+      setCredentials({
+        currentPassword: '',
+        newUsername: credentials.newUsername,
+        newPassword: '',
+        confirmPassword: '',
+      })
+      setStatus({
+        type: 'success',
+        message: 'Kimlik bilgileri güncellendi.',
+      })
     } else {
-      setStatus(result.error)
+      setStatus({
+        type: 'danger',
+        message: result.error,
+      })
     }
   }
 
@@ -77,15 +105,18 @@ export default function Settings() {
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
         <h3 className="text-lg">Depolama Klasörü</h3>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">
+          Varsayılan konum aktif Windows kullanıcısının Belgeler klasörüdür.
+        </p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
-            value={storageInput}
-            onChange={(event) => setStorageInput(event.target.value)}
-            className="flex-1 rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)]"
+            value={storagePath || ''}
+            readOnly
+            className="flex-1 rounded-lg border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
           />
           <button
             type="button"
-            onClick={handleStorageChange}
+            onClick={handleChooseStoragePath}
             className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm text-white"
           >
             Değiştir
@@ -99,7 +130,8 @@ export default function Settings() {
       >
         <h3 className="text-lg">Kimlik Bilgileri</h3>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Mevcut kullanıcı adı: <span className="text-[var(--text-primary)]">{currentUsername || '-'}</span>
+          Mevcut kullanıcı adı:{' '}
+          <span className="text-[var(--text-primary)]">{currentUsername || '-'}</span>
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="text-xs text-[var(--text-muted)]">
@@ -171,9 +203,12 @@ export default function Settings() {
       </form>
 
       {status ? (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-muted)]">
-          {status}
-        </div>
+        <AlertMessage
+          variant={status.type}
+          title={status.type === 'danger' ? 'İşlem tamamlanamadı' : 'İşlem başarılı'}
+        >
+          {status.message}
+        </AlertMessage>
       ) : null}
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6">

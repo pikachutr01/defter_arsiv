@@ -1,3 +1,42 @@
+const buildBookResults = (rows) =>
+  rows.map((row) => {
+    const sources = []
+
+    if (row.name) sources.push({ label: 'Cilt Adı', text: row.name })
+    if (row.description) sources.push({ label: 'Açıklama', text: row.description })
+    if (row.book_notes) sources.push({ label: 'Cilt Notu', text: row.book_notes })
+
+    return {
+      id: `book-${row.id}`,
+      result_type: 'book',
+      book_id: row.id,
+      title: row.name,
+      description: row.description,
+      cover_image: row.cover_image,
+      total_pages: row.total_pages,
+      match_sources: sources,
+    }
+  })
+
+const buildPageResults = (rows) =>
+  rows.map((row) => {
+    const sources = []
+
+    if (row.page_notes) sources.push({ label: 'Sayfa Notu', text: row.page_notes })
+    if (row.side_a_notes) sources.push({ label: 'A Yüzü Notu', text: row.side_a_notes })
+    if (row.side_b_notes) sources.push({ label: 'B Yüzü Notu', text: row.side_b_notes })
+
+    return {
+      id: `page-${row.id}`,
+      result_type: 'page',
+      page_id: row.id,
+      book_id: row.book_id,
+      page_number: row.page_number,
+      book_name: row.book_name,
+      match_sources: sources,
+    }
+  })
+
 export const registerSearchHandlers = ({ ipcMain, db }) => {
   ipcMain.handle('search:query', (_event, text, bookId) => {
     try {
@@ -6,25 +45,54 @@ export const registerSearchHandlers = ({ ipcMain, db }) => {
       }
 
       const trimmed = text.trim()
-      const query = `${trimmed}*`
+      const likeValue = `%${trimmed}%`
       const pageNumber = Number.parseInt(trimmed, 10)
-      let sql = `
-        SELECT DISTINCT pages.id, pages.book_id, pages.page_number, pages.page_notes, pages.side_a_notes, pages.side_b_notes,
-               pages.side_a_image, pages.side_b_image, books.name AS book_name
-        FROM pages_fts
-        JOIN pages ON pages_fts.rowid = pages.id
-        JOIN books ON pages.book_id = books.id
-        WHERE pages_fts MATCH ? OR books.name LIKE ? OR pages.page_number = ?
-      `
-      const params = [query, `%${trimmed}%`, Number.isNaN(pageNumber) ? -1 : pageNumber]
-      if (bookId) {
-        sql += ' AND books.id = ?'
-        params.push(bookId)
-      }
-      sql += ' ORDER BY pages.book_id, pages.page_number ASC'
 
-      const rows = db.prepare(sql).all(...params)
-      return { success: true, data: rows }
+      let bookSql = `
+        SELECT id, name, description, book_notes, cover_image, total_pages
+        FROM books
+        WHERE (
+          name LIKE ?
+          OR COALESCE(description, '') LIKE ?
+          OR COALESCE(book_notes, '') LIKE ?
+        )
+      `
+      const bookParams = [likeValue, likeValue, likeValue]
+
+      let pageSql = `
+        SELECT pages.id, pages.book_id, pages.page_number, pages.page_notes, pages.side_a_notes, pages.side_b_notes,
+               books.name AS book_name
+        FROM pages
+        JOIN books ON pages.book_id = books.id
+        WHERE (
+          COALESCE(pages.page_notes, '') LIKE ?
+          OR COALESCE(pages.side_a_notes, '') LIKE ?
+          OR COALESCE(pages.side_b_notes, '') LIKE ?
+      `
+      const pageParams = [likeValue, likeValue, likeValue]
+
+      if (!Number.isNaN(pageNumber)) {
+        pageSql += ' OR pages.page_number = ?'
+        pageParams.push(pageNumber)
+      }
+
+      pageSql += ')'
+
+      if (bookId) {
+        bookSql += ' AND id = ?'
+        pageSql += ' AND books.id = ?'
+        bookParams.push(bookId)
+        pageParams.push(bookId)
+      }
+
+      bookSql += ' ORDER BY name COLLATE NOCASE ASC'
+      pageSql += ' ORDER BY books.name COLLATE NOCASE ASC, pages.page_number ASC'
+
+      const bookRows = db.prepare(bookSql).all(...bookParams)
+      const pageRows = db.prepare(pageSql).all(...pageParams)
+
+      const results = [...buildBookResults(bookRows), ...buildPageResults(pageRows)]
+      return { success: true, data: results }
     } catch (error) {
       return { success: false, error: error.message }
     }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ipc } from '../utils/ipc.js'
 
 export default function PdfExport() {
-  const [selections, setSelections] = useState([])
+  const [selections] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
   const handleGenerate = async () => {

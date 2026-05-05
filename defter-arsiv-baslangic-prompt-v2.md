@@ -1,4 +1,4 @@
-# Defter Arşiv Uygulaması — Başlangıç Kurulum Promptu
+# Cilt Dijital Kayıt Sistemi — Başlangıç Kurulum Promptu
 
 > Bu prompt, bir Electron + React masaüstü arşiv uygulamasının sağlam altyapısını kurmak için AI agent'a verilecektir.
 
@@ -6,20 +6,20 @@
 
 ## GÖREV
 
-Sen deneyimli bir Electron + React masaüstü uygulama geliştiricisisin. Aşağıda tanımlanan **"Defter Arşiv Uygulaması"** için production-grade, sağlam ve genişletilebilir bir proje altyapısı kuracaksın. Kod iskeletini, klasör yapısını, veritabanı şemasını, IPC kanallarını ve temel UI bileşenlerini eksiksiz oluştur.
+Sen deneyimli bir Electron + React masaüstü uygulama geliştiricisisin. Aşağıda tanımlanan **"Cilt Dijital Kayıt Sistemi"** için production-grade, sağlam ve genişletilebilir bir proje altyapısı kuracaksın. Kod iskeletini, klasör yapısını, veritabanı şemasını, IPC kanallarını ve temel UI bileşenlerini eksiksiz oluştur.
 
 ---
 
 ## UYGULAMA HAKKINDA
 
-Kullanıcının elinde çok sayıda eski, büyük boy defter bulunmaktadır. Bu defterler sayfa sayfa fotoğraflanarak dijital ortamda arşivlenecektir. Uygulama yalnızca tek bir kişi tarafından, kişisel Windows bilgisayarında kullanılacaktır. Ticari amaç yoktur.
+Kullanıcının elinde çok sayıda eski, büyük boy cilt bulunmaktadır. Bu ciltler sayfa sayfa fotoğraflanarak dijital ortamda arşivlenecektir. Uygulama yalnızca tek bir kişi tarafından, kişisel Windows bilgisayarında kullanılacaktır. Ticari amaç yoktur.
 
 **Temel konsept:**
-- Her defterin kaç sayfası varsa o kadar sayfa kaydı sisteme girilir.
+- Her cildin kaç sayfası varsa o kadar sayfa kaydı sisteme girilir.
 - Her sayfa kaydının **iki yüzü** vardır: `A Yüzü` (ön) ve `B Yüzü` (arka / devam).
 - Her yüze ayrı bir fotoğraf yüklenebilir.
 - Fotoğrafı yüklenmiş yüzler, toplu görünümde görsel olarak işaretli (✓) gösterilir.
-- Defterler, sayfalar ve fotoğraflar kolayca aranabilir, görüntülenebilir ve dışa aktarılabilir.
+- Ciltler, sayfalar ve fotoğraflar kolayca aranabilir, görüntülenebilir ve dışa aktarılabilir.
 - Uygulamaya giriş, kullanıcı adı ve şifre ile korunmaktadır.
 
 ---
@@ -46,13 +46,13 @@ Routing:         React Router v6
 Aşağıdaki klasör yapısını **tam olarak** bu şekilde oluştur:
 
 ```
-defter-arsiv/
+cilt-dijital-kayit-sistemi/
 ├── electron/
 │   ├── main.js                  # Electron ana süreç
 │   ├── preload.js               # Context bridge (güvenli IPC)
 │   └── handlers/
 │       ├── authHandlers.js      # Giriş / kimlik doğrulama
-│       ├── bookHandlers.js      # Defter CRUD işlemleri
+│       ├── bookHandlers.js      # Cilt CRUD işlemleri
 │       ├── pageHandlers.js      # Sayfa CRUD işlemleri
 │       ├── imageHandlers.js     # Resim yükleme, silme, export
 │       ├── pdfHandlers.js       # PDF oluşturma
@@ -63,13 +63,13 @@ defter-arsiv/
 │   ├── App.jsx                  # Router ve layout (auth guard dahil)
 │   ├── store/
 │   │   ├── useAuthStore.js      # Oturum state
-│   │   ├── useBookStore.js      # Defter state
+│   │   ├── useBookStore.js      # Cilt state
 │   │   ├── usePageStore.js      # Sayfa state
 │   │   └── useSettingsStore.js  # Ayarlar state
 │   ├── pages/
 │   │   ├── Login.jsx            # Giriş ekranı
-│   │   ├── Dashboard.jsx        # Ana ekran / defter listesi
-│   │   ├── BookDetail.jsx       # Defter detay + sayfa grid'i
+│   │   ├── Dashboard.jsx        # Ana ekran / cilt listesi
+│   │   ├── BookDetail.jsx       # Cilt detay + sayfa grid'i
 │   │   ├── PageViewer.jsx       # Tek sayfa görüntüleme
 │   │   ├── Search.jsx           # Arama ekranı
 │   │   ├── PdfExport.jsx        # PDF derleme ekranı
@@ -82,7 +82,7 @@ defter-arsiv/
 │   │   │   └── ProtectedRoute.jsx   # Auth guard bileşeni
 │   │   ├── books/
 │   │   │   ├── BookCard.jsx
-│   │   │   ├── BookForm.jsx     # Defter ekle/düzenle modal
+│   │   │   ├── BookForm.jsx     # Cilt ekle/düzenle modal
 │   │   │   └── BookCover.jsx
 │   │   ├── pages/
 │   │   │   ├── PageGrid.jsx     # Toplu sayfa görünümü
@@ -119,14 +119,14 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
--- Defterler
+-- Ciltler
 CREATE TABLE IF NOT EXISTS books (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     name            TEXT NOT NULL,
     description     TEXT,
     total_pages     INTEGER NOT NULL DEFAULT 0,
     cover_image     TEXT,           -- Kapak resmi dosya yolu
-    storage_folder  TEXT,           -- Bu deftere ait özel klasör (opsiyonel)
+    storage_folder  TEXT,           -- Bu cilde ait özel klasör (opsiyonel)
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -266,7 +266,7 @@ npm install bcryptjs
 
 `electron/main.js` dosyası şu sorumlulukları taşımalı:
 
-- `app.getPath('userData')` altında `defter-arsiv/` klasörü oluştur, veritabanı burada saklanacak
+- `app.getPath('userData')` altında `cilt-dijital-kayit-sistemi/` klasörü oluştur, veritabanı burada saklanacak
 - `settings` tablosundan `storage_path` değerini oku; yoksa `userData/images/` olarak ata ve kaydet
 - İlk çalıştırmada `auth_username` ve `auth_password_hash` varsayılan değerlerini `settings` tablosuna ekle (yoksa)
 - Uygulama penceresi: `1280x800`, minimum `1024x600`, başlık çubuğu özelleştirilebilir
@@ -287,7 +287,7 @@ auth: {
     changeCredentials: (payload)  => ipcRenderer.invoke('auth:changeCredentials', payload),
 }
 
-// Defterler
+// Ciltler
 books: {
     getAll: ()           => ipcRenderer.invoke('books:getAll'),
     getById: (id)        => ipcRenderer.invoke('books:getById', id),
@@ -349,7 +349,7 @@ archive: {
 ```
 [storage_path]/              ← Ayarlardan okunur, varsayılan: userData/images/
 ├── covers/
-│   └── book_{id}.jpg        ← Defter kapakları
+│   └── book_{id}.jpg        ← Cilt kapakları
 └── books/
     └── book_{id}/
         ├── page_{number}_A.jpg        ← A yüzü orijinal
@@ -377,12 +377,12 @@ archive: {
 - Enter tuşuyla form gönderimi
 
 ### 1. Dashboard (Ana Ekran)
-- Tüm defterlerin kart görünümü (kapak resmi, isim, toplam sayfa, yüklenen fotoğraf sayısı / yüzdesi)
-- Defter ekle butonu → `BookForm` modal açılır
+- Tüm ciltlerin kart görünümü (kapak resmi, isim, toplam sayfa, yüklenen fotoğraf sayısı / yüzdesi)
+- Cilt ekle butonu → `BookForm` modal açılır
 - Her karta sağ tık menüsü: Düzenle / Sil / Klasörde Aç
 
-### 2. BookDetail (Defter Detay)
-- Üstte defter bilgileri (isim, açıklama, kapak, istatistik)
+### 2. BookDetail (Cilt Detay)
+- Üstte cilt bilgileri (isim, açıklama, kapak, istatistik)
 - Alt kısımda **PageGrid**: Her sayfa için bir kart
 - Her sayfa kartı:
   - Sayfa numarası
@@ -400,16 +400,16 @@ archive: {
 - Tam ekran modu
 
 ### 4. Search (Arama)
-- Tüm defterlerde veya belirli bir defterde arama
-- Arama alanları: not metni (FTS5), defter adı, sayfa numarası
-- Sonuçlar: thumbnail + defter adı + sayfa no + eşleşen metin
+- Tüm ciltlerde veya belirli bir ciltte arama
+- Arama alanları: not metni (FTS5), cilt adı, sayfa numarası
+- Sonuçlar: thumbnail + cilt adı + sayfa no + eşleşen metin
 - Sonuca tıklayınca ilgili `PageViewer` açılır
 
 ### 5. PdfExport (PDF Derleme)
-- Sol panel: Defter ve sayfa seçimi (checkbox ile)
+- Sol panel: Cilt ve sayfa seçimi (checkbox ile)
 - Seçilen sayfaları sağ panelde önizle (sıralı liste)
 - Sırayı sürükle-bırak ile değiştir
-- Her sayfada: defter adı + sayfa no + A/B yüzü etiketi
+- Her sayfada: cilt adı + sayfa no + A/B yüzü etiketi
 - "PDF Oluştur" → kayıt konumu seç → `pdfkit` ile oluştur
 - PDF'de her resmin altında: `[DeftterAdı] — Sayfa X — A Yüzü` bilgisi
 
@@ -431,7 +431,7 @@ archive: {
 Taşınabilirlik için ZIP tabanlı arşiv:
 
 ```
-defter-arsiv-backup-YYYY-MM-DD.zip
+cilt-dijital-kayit-sistemi-backup-YYYY-MM-DD.zip
 ├── manifest.json        # Versiyon, tarih, özet bilgi
 ├── database.sqlite      # Tam veritabanı dosyası
 └── images/              # Tüm resim dosyaları (orijinal yapıyla)
@@ -521,8 +521,8 @@ Import sırasında:
 
 ```yaml
 # electron-builder.yml
-appId: com.personal.defter-arsiv
-productName: Defter Arşiv
+appId: com.personal.cilt-dijital-kayit-sistemi
+productName: Cilt Dijital Kayıt Sistemi
 win:
   target: nsis
   icon: assets/icon.ico
@@ -546,8 +546,8 @@ Agent şu adımları sırayla çalıştırmalı:
 
 ```bash
 # 1. Proje oluştur
-npm create vite@latest defter-arsiv -- --template react
-cd defter-arsiv
+npm create vite@latest cilt-dijital-kayit-sistemi -- --template react
+cd cilt-dijital-kayit-sistemi
 
 # 2. Bağımlılıkları kur
 npm install bcryptjs better-sqlite3 sharp pdfkit archiver unzipper zustand react-router-dom
@@ -579,8 +579,8 @@ Agent aşağıdakilerin tamamının çalışır durumda olduğunu doğrulamalıd
 - [ ] `settings` tablosunda `auth_username` ve `auth_password_hash` kayıtları var
 - [ ] Tüm IPC kanalları `preload.js` üzerinden erişilebilir
 - [ ] Resim depolama klasörü otomatik oluşturuluyor
-- [ ] Dashboard'da boş defter listesi görünüyor
-- [ ] Defter ekleme modal'ı açılıyor ve formu çalışıyor
+- [ ] Dashboard'da boş cilt listesi görünüyor
+- [ ] Cilt ekleme modal'ı açılıyor ve formu çalışıyor
 - [ ] Sayfa grid'i render ediliyor
 - [ ] Arama sayfası render ediliyor
 - [ ] Ayarlar sayfasında depolama yolu ve kimlik bilgisi değiştirme formu görünüyor
@@ -595,8 +595,8 @@ Agent aşağıdakilerin tamamının çalışır durumda olduğunu doğrulamalıd
 3. **Oturum Yönetimi:** Oturum durumu yalnızca Zustand belleğinde tutulur; uygulama kapanınca sıfırlanır. `localStorage` veya harici token mekanizması kullanılmaz.
 4. **Hata Yönetimi:** Her IPC handler `try/catch` ile sarılmalı, hatalar `{ success: false, error: message }` formatında dönmeli
 5. **Thumbnail Önbellekleme:** Thumbnail'lar diske yazıldıktan sonra yeniden üretilmemeli; dosya varlığı kontrol edilmeli
-6. **Silme İşlemleri:** Defter silinince cascade ile sayfalar silinmeli, resim dosyaları da diskten kaldırılmalı
-7. **Sayfa Oluşturma:** Deftere sayfa sayısı girilince o kadar sayfa kaydı otomatik toplu oluşturulmalı (`bulkCreate`)
+6. **Silme İşlemleri:** Cilt silinince cascade ile sayfalar silinmeli, resim dosyaları da diskten kaldırılmalı
+7. **Sayfa Oluşturma:** Cilde sayfa sayısı girilince o kadar sayfa kaydı otomatik toplu oluşturulmalı (`bulkCreate`)
 8. **Resim Yolları:** Veritabanında mutlak yol değil, `storage_path`'e göre göreli yol sakla
 
 ---

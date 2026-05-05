@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../store/useAuthStore.js'
+import AlertMessage from '../components/shared/AlertMessage.jsx'
 
 export default function Login() {
   const login = useAuthStore((state) => state.login)
@@ -25,7 +26,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md animate-[fadeInUp_0.6s_ease] rounded-3xl border border-[var(--border)] bg-[rgba(17,24,39,0.8)] p-8 shadow-[var(--shadow-soft)] backdrop-blur">
+      <div className="w-full max-w-md animate-[fadeInUp_0.6s_ease] rounded-3xl border border-[var(--border)] bg-[var(--bg-card)] p-8 shadow-[var(--shadow-soft)] backdrop-blur-xl">
         <div className="text-center">
           <div className="text-xs uppercase tracking-[0.4em] text-[var(--text-muted)]">
             Cilt Dijital Kayıt Sistemi
@@ -59,16 +60,16 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="text-xs text-[var(--text-muted)]"
+                className="rounded-md px-2 py-1 text-xs text-[var(--text-muted)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
               >
                 {showPassword ? 'Gizle' : 'Göster'}
               </button>
             </div>
           </label>
           {error ? (
-            <p className="rounded-lg border border-[var(--danger)] bg-[rgba(224,82,82,0.15)] px-3 py-2 text-xs text-[var(--danger)]">
+            <AlertMessage variant="danger" title="Giriş başarısız" className="text-xs">
               {error}
-            </p>
+            </AlertMessage>
           ) : null}
           <button
             type="submit"

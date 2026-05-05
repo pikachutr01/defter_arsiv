@@ -1,4 +1,6 @@
-import fs from 'fs'
+import path from 'path'
+import { dialog } from 'electron'
+import { ensureStorageFolders, getDefaultStoragePath } from '../db.js'
 
 const getSetting = (db, key) =>
   db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value || null
@@ -9,7 +11,13 @@ const setSetting = (db, key, value) => {
   ).run(key, value)
 }
 
-export const registerSettingsHandlers = ({ ipcMain, db }) => {
+const buildFallbackStoragePath = (app) =>
+  getDefaultStoragePath({
+    userDataRoot: path.join(app.getPath('userData'), 'cilt-dijital-kayit-sistemi'),
+    documentsRoot: app.getPath('documents'),
+  })
+
+export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
   ipcMain.handle('settings:get', (_event, key) => {
     try {
       const value = getSetting(db, key)
@@ -30,7 +38,7 @@ export const registerSettingsHandlers = ({ ipcMain, db }) => {
 
   ipcMain.handle('settings:getStoragePath', () => {
     try {
-      const value = getSetting(db, 'storage_path')
+      const value = getSetting(db, 'storage_path') || buildFallbackStoragePath(app)
       return { success: true, data: value }
     } catch (error) {
       return { success: false, error: error.message }
@@ -42,9 +50,35 @@ export const registerSettingsHandlers = ({ ipcMain, db }) => {
       if (!storagePath) {
         return { success: false, error: 'Geçersiz yol.' }
       }
-      fs.mkdirSync(storagePath, { recursive: true })
+
+      ensureStorageFolders(storagePath)
       setSetting(db, 'storage_path', storagePath)
-      return { success: true }
+      return { success: true, data: storagePath }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('settings:chooseStoragePath', async () => {
+    try {
+      const currentPath =
+        getSetting(db, 'storage_path') || buildFallbackStoragePath(app)
+
+      const result = await dialog.showOpenDialog({
+        title: 'Depolama klasörünü seçin',
+        defaultPath: currentPath,
+        properties: ['openDirectory', 'createDirectory'],
+      })
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true }
+      }
+
+      const selectedPath = result.filePaths[0]
+      ensureStorageFolders(selectedPath)
+      setSetting(db, 'storage_path', selectedPath)
+
+      return { success: true, data: selectedPath }
     } catch (error) {
       return { success: false, error: error.message }
     }

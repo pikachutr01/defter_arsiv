@@ -68,6 +68,14 @@ CREATE INDEX IF NOT EXISTS idx_pages_book_page ON pages(book_id, page_number);
 
 let dbInstance = null
 
+export const getDefaultStoragePath = ({ userDataRoot, documentsRoot }) => {
+  if (documentsRoot) {
+    return path.join(documentsRoot, 'Cilt Dijital Kayit Sistemi', 'images')
+  }
+
+  return path.join(userDataRoot, 'images')
+}
+
 export const initDb = (dbPath) => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true })
   dbInstance = new Database(dbPath)
@@ -97,7 +105,10 @@ export const setSetting = (key, value) => {
     .run(key, value)
 }
 
-export const ensureDefaults = (userDataRoot) => {
+export const ensureDefaults = ({ userDataRoot, documentsRoot }) => {
+  const defaultStoragePath = getDefaultStoragePath({ userDataRoot, documentsRoot })
+  const legacyStoragePath = path.join(userDataRoot, 'images')
+
   if (!getSetting('auth_username')) {
     setSetting('auth_username', 'admin')
   }
@@ -105,9 +116,18 @@ export const ensureDefaults = (userDataRoot) => {
     const hash = bcrypt.hashSync('1234', 10)
     setSetting('auth_password_hash', hash)
   }
-  if (!getSetting('storage_path')) {
-    const storagePath = path.join(userDataRoot, 'images')
-    setSetting('storage_path', storagePath)
+
+  const currentStoragePath = getSetting('storage_path')
+  if (!currentStoragePath) {
+    setSetting('storage_path', defaultStoragePath)
+    return
+  }
+
+  if (
+    currentStoragePath === legacyStoragePath &&
+    defaultStoragePath !== legacyStoragePath
+  ) {
+    setSetting('storage_path', defaultStoragePath)
   }
 }
 
@@ -169,13 +189,13 @@ const ensureSchemaUpdates = (db) => {
   ensureColumn(db, 'books', 'book_notes', 'TEXT')
   ensureColumn(db, 'pages', 'page_notes', 'TEXT')
 
-  let ftsColumns = []
+  let ftsColumns
   try {
     ftsColumns = db
       .prepare('PRAGMA table_info(pages_fts)')
       .all()
       .map((column) => column.name)
-  } catch (error) {
+  } catch {
     ftsColumns = []
   }
 
