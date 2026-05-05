@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Yerel cilt arşivi yönetimi için Electron ve React tabanlı masaüstü uygulaması.",
-  "author": "Abdullah",
+  "author": "pikachutr01",
   "main": "electron/main.js",
   "type": "module",
   "scripts": {
