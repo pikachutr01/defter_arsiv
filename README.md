@@ -1,16 +1,45 @@
-# React + Vite
+# Cilt Dijital Kayıt Sistemi
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Electron + React tabanlı yerel arşiv uygulaması.
 
-Currently, two official plugins are available:
+## Geliştirme
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm run dev
+```
 
-## React Compiler
+## Üretim Build
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm run build
+```
 
-## Expanding the ESLint configuration
+## Şifre Kurtarma Akışı
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Uygulama her kurulum için rastgele bir `install_id` üretir. Bu değer giriş ekranında görünür ve şifre unutma durumunda destek ekibine iletilir.
+
+Kurtarma tokeni yalnızca parola sıfırlama için geçerlidir ve varsayılan olarak 24 saat sürer.
+
+### 1. Anahtar çifti üret
+
+```bash
+node scripts/generate-recovery-keys.mjs
+```
+
+Bu komut `recovery-public.pem` ve `recovery-private.pem` dosyalarını üretir.
+
+### 2. Public key'i uygulamaya göm
+
+```bash
+node scripts/embed-recovery-public-key.mjs --from recovery-public.pem
+```
+
+Bu komut `electron/recoveryKeys.js` dosyasını günceller. Build alınacak uygulamada token doğrulaması bu public key ile yapılır.
+
+### 3. Cihaza özel token üret
+
+```bash
+node scripts/generate-recovery-token.mjs --device <CIHAZ_ID> --privateKey recovery-private.pem --ttlHours 24
+```
+
+Komut cihaza özel imzalı bir token üretir. Kullanıcı bu tokeni giriş ekranındaki "Şifremi Unuttum" formuna yapıştırarak yeni şifresini belirler.

@@ -21,6 +21,30 @@ const sanitizeFileName = (value) =>
     .replace(/[<>:"/\\|?*]/g, '')
     .trim()
 
+const formatSideLabel = (side) =>
+  side === 'A' ? 'Sol Taraf' : side === 'B' ? 'Sağ Taraf' : side
+
+const resolvePdfFontPath = () => {
+  const candidatesByPlatform = {
+    win32: [
+      'C:\\Windows\\Fonts\\segoeui.ttf',
+      'C:\\Windows\\Fonts\\arial.ttf',
+      'C:\\Windows\\Fonts\\calibri.ttf',
+    ],
+    darwin: [
+      '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+      '/System/Library/Fonts/Supplemental/Arial.ttf',
+    ],
+    linux: [
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+      '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+    ],
+  }
+
+  const candidates = candidatesByPlatform[process.platform] || []
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null
+}
+
 const buildUniqueFilePath = (directoryPath, fileName) => {
   const safeBaseName =
     sanitizeFileName(path.parse(fileName).name) || 'cilt-dijital-kayit-sistemi'
@@ -75,34 +99,66 @@ export const registerPdfHandlers = ({ ipcMain, db, app }) => {
       const finalFileName = path.basename(finalPdfPath)
 
       const doc = new PDFDocument({ autoFirstPage: false, margin: 40 })
+      const pdfFontPath = resolvePdfFontPath()
+      if (pdfFontPath) {
+        doc.registerFont('ui', pdfFontPath)
+        doc.font('ui')
+      }
       const writeStream = fs.createWriteStream(finalPdfPath)
       doc.pipe(writeStream)
 
       selections.forEach((item) => {
         doc.addPage({ size: 'A4', margin: 40 })
 
-        const absPath = resolveStoragePath(storagePath, item.imagePath)
-        if (fs.existsSync(absPath)) {
-          doc.image(absPath, {
-            fit: [520, 650],
+        const PAGE_W = 520   // A4 - 2*40 margin
+        const PAGE_H = 750   // usable height
+
+        // Resim için maks yükseklik — alt not alanı için yer bırak
+        const NOTE_AREA = item.note?.trim() ? 60 : 0
+        const IMG_MAX_H = PAGE_H - NOTE_AREA - 30
+
+        let imgSource = null
+        if (item.annotatedDataUrl) {
+          // base64 data URL → buffer
+          const base64Data = item.annotatedDataUrl.split(',')[1]
+          if (base64Data) {
+            imgSource = Buffer.from(base64Data, 'base64')
+          }
+        }
+
+        if (!imgSource) {
+          const absPath = resolveStoragePath(storagePath, item.imagePath)
+          if (fs.existsSync(absPath)) {
+            imgSource = absPath
+          }
+        }
+
+        if (imgSource) {
+          doc.image(imgSource, 40, 40, {
+            fit: [PAGE_W, IMG_MAX_H],
             align: 'center',
-            valign: 'center',
+            valign: 'top',
           })
         }
 
-        doc.moveDown(1)
-        doc.fontSize(12).fillColor('#24324a')
-        doc.text(`${item.bookName} - Sayfa ${item.pageNumber} - ${item.side} Yüzü`, {
-          align: 'center',
-        })
+        // Başlık — resmin altında sabit konumda
+        const labelY = 40 + IMG_MAX_H + 8
+        doc.fontSize(11).fillColor('#24324a')
+        const bookLabel = item.bookName?.trim()
+          ? `Cilt ${item.bookName}`
+          : 'Cilt Adsız'
+        const sideLabel = formatSideLabel(item.side)
+        doc.text(
+          `${bookLabel} - Sayfa ${item.pageNumber} - ${sideLabel}`,
+          40,
+          labelY,
+          { width: PAGE_W, align: 'center' }
+        )
 
         if (item.note?.trim()) {
-          doc.moveDown(0.7)
-          doc.fontSize(11).fillColor('#4a5c78')
-          doc.text(item.note.trim(), {
-            align: 'center',
-            width: 500,
-          })
+          doc.moveDown(0.5)
+          doc.fontSize(10).fillColor('#4a5c78')
+          doc.text(item.note.trim(), { width: PAGE_W, align: 'center' })
         }
       })
 
@@ -174,6 +230,19 @@ export const registerPdfHandlers = ({ ipcMain, db, app }) => {
         return { success: false, error: result }
       }
 
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('pdf:delete', (_event, filePath) => {
+    try {
+      if (!filePath || !fs.existsSync(filePath)) {
+        return { success: false, error: 'PDF bulunamadı.' }
+      }
+
+      fs.rmSync(filePath, { force: true })
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

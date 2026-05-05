@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import Modal from '../components/shared/Modal.jsx'
 import EmptyState from '../components/shared/EmptyState.jsx'
 import ImageViewer from '../components/images/ImageViewer.jsx'
+import AnnotationCanvas from '../components/images/AnnotationCanvas.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
 import usePdfQueueStore from '../store/usePdfQueueStore.js'
 import useSettingsStore from '../store/useSettingsStore.js'
@@ -31,7 +32,10 @@ const formatFileSize = (bytes) => {
   return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${units[index]}`
 }
 
-function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving }) {
+const formatSideLabel = (side) =>
+  side === 'A' ? 'Sol Taraf' : side === 'B' ? 'Sağ Taraf' : side
+
+function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving, clearQueue, onToggleClearQueue }) {
   return (
     <Modal title="PDF Adı" onClose={onClose} panelClassName="max-w-xl">
       <div className="space-y-4">
@@ -46,6 +50,29 @@ function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving }) {
           placeholder="Örnek: 1915-Defter-1-Seçili-Sayfalar"
           className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
         />
+        {/* Switch: oluşturulunca kuyruğu temizle */}
+        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3">
+          <span className="text-sm text-[var(--text-primary)]">
+            Oluşturulunca aktif resimleri kaldır
+          </span>
+          <button
+            type="button"
+            onClick={onToggleClearQueue}
+            role="switch"
+            aria-checked={clearQueue}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 transition-colors duration-200 ${
+              clearQueue
+                ? 'border-[var(--accent)] bg-[var(--accent)]'
+                : 'border-[var(--border)] bg-[var(--bg-card)]'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                clearQueue ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </label>
         <div className="flex justify-end gap-3">
           <button
             type="button"
@@ -79,8 +106,11 @@ function PdfQueueCard({
   onDragOver,
   onDrop,
   isDragging,
+  onAnnotate,
 }) {
-  const imageUrl = toLocalAssetUrl(storagePath, item.imagePath)
+  const imageUrl = item.annotatedDataUrl
+    ? item.annotatedDataUrl
+    : toLocalAssetUrl(storagePath, item.imagePath)
 
   return (
     <article
@@ -101,16 +131,30 @@ function PdfQueueCard({
             {item.bookName || 'Adsız Cilt'}
           </p>
           <p className="text-[11px] text-[var(--text-muted)]">
-            Sayfa {item.pageNumber} • {item.side} Yüzü
+            Sayfa {item.pageNumber} • {formatSideLabel(item.side)}
+            {item.annotatedDataUrl ? (
+              <span className="ml-1.5 rounded-full bg-[var(--accent-dim)] px-1.5 py-0.5 text-[10px] text-[var(--accent)]">
+                çizimli
+              </span>
+            ) : null}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="rounded-lg border border-[var(--danger-border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-primary)] transition hover:border-[var(--danger-strong)]"
-        >
-          Çıkar
-        </button>
+        <div className="flex shrink-0 gap-1">
+          <button
+            type="button"
+            onClick={onAnnotate}
+            className="rounded-lg border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)] transition hover:border-[var(--accent)] hover:text-[var(--text-primary)]"
+          >
+            ✏️
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded-lg border border-[var(--danger-border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-primary)] transition hover:border-[var(--danger-strong)]"
+          >
+            Çıkar
+          </button>
+        </div>
       </div>
 
       <button
@@ -121,7 +165,7 @@ function PdfQueueCard({
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={`${item.bookName} ${item.pageNumber} ${item.side}`}
+            alt={`${item.bookName} ${item.pageNumber} ${formatSideLabel(item.side)}`}
             className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
           />
         ) : (
@@ -145,7 +189,7 @@ function PdfQueueCard({
   )
 }
 
-function PdfSavedCard({ item, onOpen }) {
+function PdfSavedCard({ item, onOpen, onDelete }) {
   return (
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-start gap-4">
@@ -179,13 +223,22 @@ function PdfSavedCard({ item, onOpen }) {
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="mt-4 w-full rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-      >
-        Aç
-      </button>
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        >
+          Aç
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="rounded-xl border border-[var(--danger-border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--danger-strong)]"
+        >
+          Sil
+        </button>
+      </div>
     </article>
   )
 }
@@ -193,18 +246,23 @@ function PdfSavedCard({ item, onOpen }) {
 export default function PdfExport() {
   const items = usePdfQueueStore((state) => state.items)
   const updateItemNote = usePdfQueueStore((state) => state.updateItemNote)
+  const updateItemAnnotation = usePdfQueueStore((state) => state.updateItemAnnotation)
   const removeItem = usePdfQueueStore((state) => state.removeItem)
   const reorderItems = usePdfQueueStore((state) => state.reorderItems)
+  const clearItems = usePdfQueueStore((state) => state.clearItems)
   const storagePath = useSettingsStore((state) => state.storagePath)
   const [activeTab, setActiveTab] = useState('create')
   const [savedPdfs, setSavedPdfs] = useState([])
   const [isLoadingPdfs, setIsLoadingPdfs] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [viewerItem, setViewerItem] = useState(null)
+  const [annotatingItem, setAnnotatingItem] = useState(null)
   const [dragIndex, setDragIndex] = useState(null)
   const [dropIndex, setDropIndex] = useState(null)
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false)
   const [pdfFileName, setPdfFileName] = useState('')
+  const [clearQueueOnSuccess, setClearQueueOnSuccess] = useState(false)
+  const [pendingDeletePdf, setPendingDeletePdf] = useState(null)
   const { showToast } = useToast()
 
   const queueCountLabel = useMemo(() => `${items.length} görsel seçildi`, [items.length])
@@ -255,6 +313,9 @@ export default function PdfExport() {
 
     if (result.success) {
       setIsNameDialogOpen(false)
+      if (clearQueueOnSuccess) {
+        clearItems()
+      }
       await handleTabChange('saved')
       showToast({
         variant: 'success',
@@ -279,6 +340,18 @@ export default function PdfExport() {
         title: 'PDF açılamadı',
         message: result.error || 'PDF varsayılan uygulamada açılamadı.',
       })
+    }
+  }
+
+  const handleDeletePdf = async () => {
+    if (!pendingDeletePdf) return
+    const result = await ipc.pdfDelete(pendingDeletePdf.filePath)
+    setPendingDeletePdf(null)
+    if (result.success) {
+      setSavedPdfs((prev) => prev.filter((p) => p.filePath !== pendingDeletePdf.filePath))
+      showToast({ variant: 'success', title: 'PDF silindi', message: `${pendingDeletePdf.name} silindi.` })
+    } else {
+      showToast({ variant: 'danger', title: 'Silinemedi', message: result.error || 'PDF silinemedi.' })
     }
   }
 
@@ -361,6 +434,7 @@ export default function PdfExport() {
                   onOpenViewer={() => setViewerItem(item)}
                   onRemove={() => removeItem(item.pageId, item.side)}
                   onNoteChange={(note) => updateItemNote(item.pageId, item.side, note)}
+                  onAnnotate={() => setAnnotatingItem(item)}
                   onDragStart={setDragIndex}
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
@@ -396,6 +470,7 @@ export default function PdfExport() {
               key={item.id}
               item={item}
               onOpen={() => handleOpenPdf(item.filePath)}
+              onDelete={() => setPendingDeletePdf(item)}
             />
           ))}
         </div>
@@ -403,9 +478,10 @@ export default function PdfExport() {
 
       {viewerItem ? (
         <ImageViewer
-          title={`${viewerItem.bookName} - Sayfa ${viewerItem.pageNumber} - ${viewerItem.side} Yüzü`}
+          title={`${viewerItem.bookName} - Sayfa ${viewerItem.pageNumber} - ${formatSideLabel(viewerItem.side)}`}
           imagePath={viewerItem.imagePath}
           onClose={() => setViewerItem(null)}
+          panelClassName="max-w-[85vw] w-full"
         />
       ) : null}
 
@@ -416,7 +492,46 @@ export default function PdfExport() {
           onClose={() => setIsNameDialogOpen(false)}
           onConfirm={handleGenerate}
           isSaving={isSaving}
+          clearQueue={clearQueueOnSuccess}
+          onToggleClearQueue={() => setClearQueueOnSuccess((v) => !v)}
         />
+      ) : null}
+
+      {annotatingItem ? (
+        <AnnotationCanvas
+          item={annotatingItem}
+          onClose={() => setAnnotatingItem(null)}
+          onSave={(dataUrl) =>
+            updateItemAnnotation(annotatingItem.pageId, annotatingItem.side, dataUrl)
+          }
+        />
+      ) : null}
+
+      {pendingDeletePdf ? (
+        <Modal title="PDF Sil" onClose={() => setPendingDeletePdf(null)} panelClassName="max-w-xl">
+          <div className="rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-surface)] px-4 py-4">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Bu işlem geri alınamaz.</p>
+            <p className="mt-2 text-sm text-[var(--text-primary)]/82">
+              <span className="font-semibold">{pendingDeletePdf.name}</span> kalıcı olarak silinecek.
+            </p>
+          </div>
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setPendingDeletePdf(null)}
+              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-muted)] transition hover:border-[var(--accent)]"
+            >
+              Vazgeç
+            </button>
+            <button
+              type="button"
+              onClick={handleDeletePdf}
+              className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--danger-strong)]"
+            >
+              Sil
+            </button>
+          </div>
+        </Modal>
       ) : null}
     </section>
   )

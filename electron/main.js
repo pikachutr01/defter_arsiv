@@ -22,6 +22,18 @@ const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
 
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'local-file',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+])
+
 const registerLocalAssetProtocol = () => {
   protocol.handle('local-file', (request) => {
     const filePath = new URL(request.url).searchParams.get('path')

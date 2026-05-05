@@ -10,6 +10,7 @@ import PageViewer from './pages/PageViewer.jsx'
 import Search from './pages/Search.jsx'
 import PdfExport from './pages/PdfExport.jsx'
 import Settings from './pages/Settings.jsx'
+import Help from './pages/Help.jsx'
 import useSettingsStore from './store/useSettingsStore.js'
 import useThemeStore from './store/useThemeStore.js'
 
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="search" element={<Search />} />
           <Route path="pdf-export" element={<PdfExport />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="help" element={<Help />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Route>

@@ -59,8 +59,8 @@ export default function PageCard({ page, onSelect }) {
           Sayfa {page.page_number}
         </span>
       </div>
-      <SideBadge uploaded={page.side_a_uploaded === 1} label="A Yüzü" />
-      <SideBadge uploaded={page.side_b_uploaded === 1} label="B Yüzü" />
+      <SideBadge uploaded={page.side_a_uploaded === 1} label="Sol Taraf" />
+      <SideBadge uploaded={page.side_b_uploaded === 1} label="Sağ Taraf" />
     </button>
   )
 }

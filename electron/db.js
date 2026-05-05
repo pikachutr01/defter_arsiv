@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import Database from 'better-sqlite3'
 
@@ -115,6 +116,9 @@ export const ensureDefaults = ({ userDataRoot, documentsRoot }) => {
   if (!getSetting('auth_password_hash')) {
     const hash = bcrypt.hashSync('1234', 10)
     setSetting('auth_password_hash', hash)
+  }
+  if (!getSetting('install_id')) {
+    setSetting('install_id', crypto.randomUUID())
   }
 
   const currentStoragePath = getSetting('storage_path')

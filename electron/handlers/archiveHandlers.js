@@ -90,6 +90,13 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
   })
 
   ipcMain.handle('archive:importFull', async () => {
+    let backupPath = null
+    let storagePath = null
+    let currentDbPath = null
+    let backupReady = false
+    let replacedDb = false
+    let replacedImages = false
+
     try {
       const openResult = await dialog.showOpenDialog({
         title: 'Arşiv İçe Aktar',
@@ -103,21 +110,22 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
 
       const zipPath = openResult.filePaths[0]
       const dataPath = getAppDataPath()
-      const storagePath = getStoragePath(db)
+      storagePath = getStoragePath(db)
       if (!storagePath) {
         return { success: false, error: 'Depolama yolu tanımlı değil.' }
       }
 
-      const backupPath = path.join(dataPath, `backup-${Date.now()}`)
+      backupPath = path.join(dataPath, `backup-${Date.now()}`)
       ensureDir(backupPath)
 
-      const currentDbPath = path.join(dataPath, 'database.sqlite')
+      currentDbPath = path.join(dataPath, 'database.sqlite')
       if (fs.existsSync(currentDbPath)) {
         copyRecursive(currentDbPath, path.join(backupPath, 'database.sqlite'))
       }
       if (fs.existsSync(storagePath)) {
         copyRecursive(storagePath, path.join(backupPath, 'images'))
       }
+      backupReady = true
 
       const tempDir = fs.mkdtempSync(path.join(dataPath, 'import-'))
       await fs
@@ -128,18 +136,43 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
       const importedDb = path.join(tempDir, 'database.sqlite')
       const importedImages = path.join(tempDir, 'images')
 
-      if (fs.existsSync(importedDb)) {
-        copyRecursive(importedDb, currentDbPath)
+      if (!fs.existsSync(importedDb)) {
+        removeIfExists(tempDir)
+        return { success: false, error: 'Arşivde veritabanı bulunamadı.' }
       }
+
+      copyRecursive(importedDb, currentDbPath)
+      replacedDb = true
 
       if (fs.existsSync(importedImages)) {
         removeIfExists(storagePath)
         copyRecursive(importedImages, storagePath)
+        replacedImages = true
       }
 
       removeIfExists(tempDir)
+      if (backupPath) {
+        removeIfExists(backupPath)
+      }
+      setTimeout(() => {
+        app.relaunch()
+        app.exit(0)
+      }, 150)
       return { success: true }
     } catch (error) {
+      if (backupReady && backupPath) {
+        const backupDbPath = path.join(backupPath, 'database.sqlite')
+        const backupImagesPath = path.join(backupPath, 'images')
+
+        if (replacedDb && fs.existsSync(backupDbPath)) {
+          copyRecursive(backupDbPath, currentDbPath)
+        }
+
+        if (replacedImages && fs.existsSync(backupImagesPath) && storagePath) {
+          removeIfExists(storagePath)
+          copyRecursive(backupImagesPath, storagePath)
+        }
+      }
       return { success: false, error: error.message }
     }
   })

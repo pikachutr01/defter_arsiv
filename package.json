@@ -1,14 +1,20 @@
 {
   "name": "cilt-dijital-kayit-sistemi",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Yerel cilt arşivi yönetimi için Electron ve React tabanlı masaüstü uygulaması.",
+  "author": "Abdullah",
   "main": "electron/main.js",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite\" \"electron .\"",
     "build": "vite build && electron-builder",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "electron-builder install-app-deps",
+    "recovery:keys": "node scripts/generate-recovery-keys.mjs",
+    "recovery:embed-public-key": "node scripts/embed-recovery-public-key.mjs",
+    "recovery:token": "node scripts/generate-recovery-token.mjs"
   },
   "dependencies": {
     "archiver": "^7.0.1",
@@ -31,7 +37,6 @@
     "concurrently": "^9.2.1",
     "electron": "^41.5.0",
     "electron-builder": "^26.8.1",
-    "electron-rebuild": "^3.2.9",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

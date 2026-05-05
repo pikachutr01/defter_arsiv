@@ -15,6 +15,7 @@ const usePdfQueueStore = create((set) => ({
             {
               ...item,
               note: item.note || '',
+              annotatedDataUrl: null,
             },
           ],
         }
@@ -27,6 +28,7 @@ const usePdfQueueStore = create((set) => ({
                 ...entry,
                 ...item,
                 note: item.note ?? entry.note ?? '',
+                annotatedDataUrl: entry.annotatedDataUrl ?? null,
               }
             : entry
         ),
@@ -58,6 +60,7 @@ const usePdfQueueStore = create((set) => ({
           {
             ...item,
             note: item.note || '',
+            annotatedDataUrl: null,
           },
         ],
       }
@@ -66,6 +69,14 @@ const usePdfQueueStore = create((set) => ({
     set((state) => ({
       items: state.items.map((entry) =>
         entry.pageId === pageId && entry.side === side ? { ...entry, note } : entry
+      ),
+    })),
+  updateItemAnnotation: (pageId, side, annotatedDataUrl) =>
+    set((state) => ({
+      items: state.items.map((entry) =>
+        entry.pageId === pageId && entry.side === side
+          ? { ...entry, annotatedDataUrl }
+          : entry
       ),
     })),
   reorderItems: (fromIndex, toIndex) =>

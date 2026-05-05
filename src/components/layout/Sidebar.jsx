@@ -67,6 +67,28 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    to: '/help',
+    label: 'Yardım',
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+        <path
+          d="M12 4.5a6.5 6.5 0 0 0-6.5 6.5c0 2.2 1.1 4.1 2.8 5.3l.2 2.7 2.6-1.3c.3.1.6.1.9.1h.1a6.5 6.5 0 1 0 0-13Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M9.7 9.7a2.3 2.3 0 1 1 3.9 1.7c-.7.6-1.3 1-1.3 2"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+        <circle cx="12" cy="16.8" r="0.9" fill="currentColor" />
+      </svg>
+    ),
+  },
 ]
 
 export default function Sidebar() {

@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+recovery-private.pem
+recovery.txt
+recovery-public.pem

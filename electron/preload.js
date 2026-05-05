@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     login: (credentials) => ipcRenderer.invoke('auth:login', credentials),
     changeCredentials: (payload) =>
       ipcRenderer.invoke('auth:changeCredentials', payload),
+    resetWithToken: (payload) => ipcRenderer.invoke('auth:resetWithToken', payload),
   },
   books: {
     getAll: () => ipcRenderer.invoke('books:getAll'),
@@ -46,6 +47,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     generate: (payload) => ipcRenderer.invoke('pdf:generate', payload),
     list: () => ipcRenderer.invoke('pdf:list'),
     open: (filePath) => ipcRenderer.invoke('pdf:open', filePath),
+    delete: (filePath) => ipcRenderer.invoke('pdf:delete', filePath),
   },
   settings: {
     get: (key) => ipcRenderer.invoke('settings:get', key),
@@ -54,6 +56,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setStoragePath: (value) =>
       ipcRenderer.invoke('settings:setStoragePath', value),
     chooseStoragePath: () => ipcRenderer.invoke('settings:chooseStoragePath'),
+    scanStorageIntegrity: (payload) =>
+      ipcRenderer.invoke('settings:scanStorageIntegrity', payload),
+    deleteOrphanFiles: (payload) =>
+      ipcRenderer.invoke('settings:deleteOrphanFiles', payload),
+    clearMissingRefs: (payload) =>
+      ipcRenderer.invoke('settings:clearMissingRefs', payload),
   },
   archive: {
     exportFull: () => ipcRenderer.invoke('archive:exportFull'),

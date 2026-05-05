@@ -163,7 +163,25 @@ export default function BookDetail() {
     <section className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl">{book?.name || 'Cilt'}</h2>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] p-2 text-[var(--text-primary)] transition hover:border-[var(--accent)]"
+              title="Geri"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+                <path
+                  d="m15 6-6 6 6 6"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <h2 className="text-2xl">{book?.name || 'Cilt'}</h2>
+          </div>
           <p className="text-sm text-[var(--text-muted)]">
             Sayfaları düzenle ve fotoğrafları yükle.
           </p>

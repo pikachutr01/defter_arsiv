@@ -23,8 +23,8 @@ const buildPageResults = (rows) =>
     const sources = []
 
     if (row.page_notes) sources.push({ label: 'Sayfa Notu', text: row.page_notes })
-    if (row.side_a_notes) sources.push({ label: 'A Yüzü Notu', text: row.side_a_notes })
-    if (row.side_b_notes) sources.push({ label: 'B Yüzü Notu', text: row.side_b_notes })
+    if (row.side_a_notes) sources.push({ label: 'Sol Taraf Notu', text: row.side_a_notes })
+    if (row.side_b_notes) sources.push({ label: 'Sağ Taraf Notu', text: row.side_b_notes })
 
     return {
       id: `page-${row.id}`,

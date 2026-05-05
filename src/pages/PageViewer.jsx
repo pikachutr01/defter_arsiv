@@ -9,8 +9,11 @@ import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
 import usePdfQueueStore from '../store/usePdfQueueStore.js'
 
+const formatSideLabel = (side) =>
+  side === 'A' ? 'Sol Taraf' : side === 'B' ? 'Sağ Taraf' : side
+
 function PageImagePanel({
-  side,
+  sideLabel,
   imagePath,
   notesValue,
   placeholderLabel,
@@ -47,7 +50,7 @@ function PageImagePanel({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-lg">{side} Yüzü</h3>
+      <h3 className="text-lg">{sideLabel}</h3>
       {imageUrl ? (
         <div
           onDragOver={(event) => {
@@ -69,7 +72,7 @@ function PageImagePanel({
           >
             <img
               src={imageUrl}
-              alt={`${side} yüzü`}
+              alt={`${sideLabel} görseli`}
               className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
             />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-[rgba(7,11,18,0.92)] via-[rgba(7,11,18,0.28)] to-transparent px-4 py-3 text-xs text-white/85">
@@ -199,10 +202,11 @@ export default function PageViewer() {
 
     if (result.success) {
       await loadPage()
+      const sideLabel = formatSideLabel(side)
       showToast({
         variant: 'success',
         title: 'Görsel güncellendi',
-        message: `${side} yüzü görseli başarıyla kaydedildi.`,
+        message: `${sideLabel} görseli başarıyla kaydedildi.`,
       })
       return
     }
@@ -229,10 +233,11 @@ export default function PageViewer() {
 
     if (result.success) {
       await loadPage()
+      const sideLabel = formatSideLabel(side)
       showToast({
         variant: 'success',
         title: 'Görsel silindi',
-        message: `${side} yüzüne ait görsel kaldırıldı.`,
+        message: `${sideLabel} görseli kaldırıldı.`,
       })
       return
     }
@@ -321,17 +326,17 @@ export default function PageViewer() {
           </h2>
         </div>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          A ve B yüzlerini yan yana kontrol et.
+          Sol ve sağ tarafları yan yana kontrol et.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <PageImagePanel
-          side="A"
+          sideLabel={formatSideLabel('A')}
           imagePath={page?.side_a_image}
           notesValue={notes.a}
-          placeholderLabel="A Yüzü Yükle"
-          notesPlaceholder="A yüzü notu"
+          placeholderLabel="Sol Taraf Yükle"
+          notesPlaceholder="Sol taraf notu"
           onNotesChange={(event) =>
             setNotes((prev) => ({ ...prev, a: event.target.value }))
           }
@@ -358,11 +363,11 @@ export default function PageViewer() {
           storagePath={storagePath}
         />
         <PageImagePanel
-          side="B"
+          sideLabel={formatSideLabel('B')}
           imagePath={page?.side_b_image}
           notesValue={notes.b}
-          placeholderLabel="B Yüzü Yükle"
-          notesPlaceholder="B yüzü notu"
+          placeholderLabel="Sağ Taraf Yükle"
+          notesPlaceholder="Sağ taraf notu"
           onNotesChange={(event) =>
             setNotes((prev) => ({ ...prev, b: event.target.value }))
           }
@@ -415,7 +420,7 @@ export default function PageViewer() {
 
       {viewerImagePath ? (
         <ImageViewer
-          title={`${viewerSide} Yüzü Görüntüle`}
+          title={`${formatSideLabel(viewerSide)} Görüntüle`}
           imagePath={viewerImagePath}
           onClose={() => setViewerSide(null)}
         />
@@ -424,7 +429,7 @@ export default function PageViewer() {
       {pendingDeleteSide ? (
         <ConfirmDialog
           title="Görseli Sil"
-          message={`${pendingDeleteSide} yüzüne ait görsel kalıcı olarak silinecek. Devam etmek istiyor musun?`}
+          message={`${formatSideLabel(pendingDeleteSide)} görseli kalıcı olarak silinecek. Devam etmek istiyor musun?`}
           onCancel={() => setPendingDeleteSide(null)}
           onConfirm={handleDeleteImage}
         />

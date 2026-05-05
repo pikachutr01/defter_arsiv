@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../store/useAuthStore.js'
+import { ipc } from '../utils/ipc.js'
 import AlertMessage from '../components/shared/AlertMessage.jsx'
 
 export default function Login() {
@@ -12,6 +13,13 @@ export default function Login() {
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [deviceId, setDeviceId] = useState('')
+  const [isResetOpen, setIsResetOpen] = useState(false)
+  const [resetToken, setResetToken] = useState('')
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetConfirm, setResetConfirm] = useState('')
+  const [resetStatus, setResetStatus] = useState(null)
+  const [isResetting, setIsResetting] = useState(false)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -23,6 +31,50 @@ export default function Login() {
       navigate('/')
     }
   }, [isAuthenticated, navigate])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadDeviceId = async () => {
+      const result = await ipc.settingsGet('install_id')
+      if (isMounted && result.success) {
+        setDeviceId(result.data || '')
+      }
+    }
+
+    loadDeviceId()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const handleResetSubmit = async (event) => {
+    event.preventDefault()
+    setResetStatus(null)
+
+    if (resetPassword !== resetConfirm) {
+      setResetStatus({ type: 'danger', message: 'Sifreler eslesmiyor.' })
+      return
+    }
+
+    setIsResetting(true)
+    const result = await ipc.authResetWithToken({
+      token: resetToken.trim(),
+      newPassword: resetPassword,
+    })
+    setIsResetting(false)
+
+    if (result.success) {
+      setResetStatus({ type: 'success', message: 'Sifre sifirlandi. Giris yapabilirsin.' })
+      setResetToken('')
+      setResetPassword('')
+      setResetConfirm('')
+      return
+    }
+
+    setResetStatus({ type: 'danger', message: result.error || 'Islem basarisiz.' })
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -78,8 +130,102 @@ export default function Login() {
           >
             {isLoading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsResetOpen(true)
+              setResetStatus(null)
+            }}
+            className="text-xs text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
+          >
+            Şifremi Unuttum
+          </button>
         </form>
+
+        {deviceId ? (
+          <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-xs text-[var(--text-muted)]">
+            Cihaz Kimliği: <span className="text-[var(--text-primary)]">{deviceId}</span>
+          </div>
+        ) : null}
       </div>
+
+      {isResetOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg">Kurtarma Kodu ile Şifre Sıfırla</h3>
+              <button
+                type="button"
+                onClick={() => setIsResetOpen(false)}
+                className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-muted)] transition hover:border-[var(--accent)] hover:text-[var(--text-primary)]"
+              >
+                Kapat
+              </button>
+            </div>
+
+            <form onSubmit={handleResetSubmit} className="flex flex-col gap-3">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-3 text-xs text-[var(--text-muted)]">
+                Destek ekibine cihaz kimliğini iletip bu cihaza özel 24 saatlik şifre
+                sıfırlama tokeni isteyin.
+                {deviceId ? (
+                  <div className="mt-2">
+                    Cihaz Kimliği:{' '}
+                    <span className="break-all text-[var(--text-primary)]">{deviceId}</span>
+                  </div>
+                ) : null}
+              </div>
+
+              <label className="text-xs text-[var(--text-muted)]">
+                Kurtarma Tokeni
+                <input
+                  value={resetToken}
+                  onChange={(event) => setResetToken(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+                  required
+                />
+              </label>
+              <label className="text-xs text-[var(--text-muted)]">
+                Yeni Şifre
+                <input
+                  type="password"
+                  value={resetPassword}
+                  onChange={(event) => setResetPassword(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+                  required
+                />
+              </label>
+              <label className="text-xs text-[var(--text-muted)]">
+                Yeni Şifre Tekrar
+                <input
+                  type="password"
+                  value={resetConfirm}
+                  onChange={(event) => setResetConfirm(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+                  required
+                />
+              </label>
+
+              {resetStatus ? (
+                <AlertMessage
+                  variant={resetStatus.type === 'danger' ? 'danger' : 'success'}
+                  title={resetStatus.type === 'danger' ? 'İşlem başarısız' : 'İşlem başarılı'}
+                  className="text-xs"
+                >
+                  {resetStatus.message}
+                </AlertMessage>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isResetting}
+                className="mt-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-60"
+              >
+                {isResetting ? 'Sıfırlanıyor...' : 'Şifreyi Sıfırla'}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
