@@ -3,10 +3,6 @@ import path from 'path'
 import sharp from 'sharp'
 import { dialog, shell } from 'electron'
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const JPEG_QUALITY = 82
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 let _cachedStoragePath = undefined
@@ -53,7 +49,13 @@ const removeIfExists = (targetPath) => {
   if (targetPath && fs.existsSync(targetPath)) fs.unlinkSync(targetPath)
 }
 
-const optimizeAndSaveImage = async (sourcePath, targetPath) => {
+const getImageQuality = (db) => {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'image_quality'").get()
+  return row ? parseInt(row.value, 10) : 80
+}
+
+const optimizeAndSaveImage = async (db, sourcePath, targetPath) => {
+  const quality = getImageQuality(db)
   const instance = sharp(sourcePath, { failOn: 'none' }).rotate()
   const metadata = await instance.metadata()
 
@@ -63,7 +65,7 @@ const optimizeAndSaveImage = async (sourcePath, targetPath) => {
 
   await pipeline
     .jpeg({
-      quality: JPEG_QUALITY,
+      quality,
       mozjpeg: true,
       progressive: true,
       chromaSubsampling: '4:4:4',
@@ -94,7 +96,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       const imagePaths = buildImagePaths(storagePath, page.book_id, page.page_number)
 
       ensureDir(imagePaths.baseFolder)
-      await optimizeAndSaveImage(sourcePath, imagePaths.originalAbs)
+      await optimizeAndSaveImage(db, sourcePath, imagePaths.originalAbs)
       removeIfExists(imagePaths.legacyThumbAbs)
 
       updatePageImage(db, pageId, imagePaths.originalRel, true)
@@ -142,6 +144,53 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       removeIfExists(imagePaths.legacyThumbAbs)
 
       updatePageImage(db, pageId, null, false)
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('images:rotate', async (_event, pageId) => {
+    try {
+      const storagePath = getStoragePath(db)
+      if (!storagePath) {
+        return { success: false, error: 'Depolama yolu tanımlı değil.' }
+      }
+
+      const page = getPageInfo(db, pageId)
+      if (!page) {
+        return { success: false, error: 'Sayfa bulunamadı.' }
+      }
+
+      const imagePaths = buildImagePaths(storagePath, page.book_id, page.page_number)
+
+      if (!fs.existsSync(imagePaths.originalAbs)) {
+        return { success: false, error: 'Döndürülecek resim bulunamadı.' }
+      }
+
+      const tempPath = imagePaths.originalAbs + '.tmp.jpg'
+      const quality = getImageQuality(db)
+
+      const instance = sharp(imagePaths.originalAbs, { failOn: 'none' }).rotate(-90)
+      const metadata = await instance.metadata()
+
+      const pipeline = metadata.hasAlpha
+        ? instance.flatten({ background: '#ffffff' })
+        : instance
+
+      await pipeline
+        .jpeg({
+          quality: quality,
+          mozjpeg: true,
+          progressive: true,
+          chromaSubsampling: '4:4:4',
+        })
+        .toFile(tempPath)
+
+      fs.unlinkSync(imagePaths.originalAbs)
+      fs.renameSync(tempPath, imagePaths.originalAbs)
+
+      updatePageImage(db, pageId, imagePaths.originalRel, true)
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

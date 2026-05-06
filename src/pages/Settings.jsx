@@ -28,6 +28,7 @@ export default function Settings() {
   })
   const [status, setStatus] = useState(null)
   const [currentUsername, setCurrentUsername] = useState('')
+  const [imageQuality, setImageQuality] = useState(80)
   const [scanResult, setScanResult] = useState(null)
   const [scanStatus, setScanStatus] = useState(null)
   const [scanError, setScanError] = useState(null)
@@ -63,7 +64,14 @@ export default function Settings() {
         setCurrentUsername(result.data || '')
       }
     }
+    const loadQuality = async () => {
+      const result = await ipc.settingsGet('image_quality')
+      if (isMounted && result.success && result.data) {
+        setImageQuality(parseInt(result.data, 10))
+      }
+    }
     loadUsername()
+    loadQuality()
     return () => {
       isMounted = false
     }
@@ -179,6 +187,12 @@ export default function Settings() {
     [credentials]
   )
 
+  const handleQualityChange = useCallback(async (event) => {
+    const val = parseInt(event.target.value, 10)
+    setImageQuality(val)
+    await ipc.settingsSet('image_quality', val)
+  }, [])
+
   const handleCredentialFieldChange = useCallback((event) => {
     const { name, value } = event.target
     setCredentials((prev) => ({ ...prev, [name]: value }))
@@ -246,6 +260,34 @@ export default function Settings() {
           >
             Değiştir
           </button>
+        </div>
+      </div>
+
+      {/* Sıkıştırma Ayarları */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg">Resim Kalitesi (Sıkıştırma)</h3>
+            <span className="text-sm font-semibold text-[var(--accent)]">%{imageQuality}</span>
+          </div>
+          <p className="text-sm text-[var(--text-muted)]">
+            Eklenen sayfaların diskte kaplayacağı boyutu ve görsel kalitesini buradan ayarlayabilirsin. Daha düşük kalite daha az yer kaplar. Varsayılan değer: %80
+          </p>
+          <div className="mt-4 flex items-center gap-4">
+            <input
+              type="range"
+              min="10"
+              max="100"
+              step="5"
+              value={imageQuality}
+              onChange={handleQualityChange}
+              className="w-full accent-[var(--accent)] cursor-pointer"
+            />
+          </div>
+          <div className="flex justify-between text-xs text-[var(--text-muted)] px-1">
+            <span>Düşük Boyut (%10)</span>
+            <span>Yüksek Kalite (%100)</span>
+          </div>
         </div>
       </div>
 

@@ -31,6 +31,7 @@ export const ipc = {
   imagesExport: (imagePaths, destFolder) =>
     getApi().images.export(imagePaths, destFolder),
   imagesGetThumbnail: (imagePath) => getApi().images.getThumbnail(imagePath),
+  imagesRotate: (pageId) => getApi().images.rotate(pageId),
   searchQuery: (text, bookId) => getApi().search.query(text, bookId),
   pdfGenerate: (payload) => getApi().pdf.generate(payload),
   pdfList: () => getApi().pdf.list(),

@@ -39,6 +39,7 @@ const PageImagePanel = memo(function PageImagePanel({
   imagePath,
   updatedAt,
   onUpload,
+  onRotate,
   onDelete,
   onOpenViewer,
   onReveal,
@@ -60,8 +61,8 @@ const PageImagePanel = memo(function PageImagePanel({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`overflow-hidden rounded-2xl border transition ${isDragging
-            ? 'border-[var(--accent)] ring-2 ring-[rgba(79,142,247,0.22)]'
-            : 'border-[var(--border)]'
+          ? 'border-[var(--accent)] ring-2 ring-[rgba(79,142,247,0.22)]'
+          : 'border-[var(--border)]'
           } bg-[rgba(255,255,255,0.02)]`}
       >
         {imageUrl ? (
@@ -88,8 +89,8 @@ const PageImagePanel = memo(function PageImagePanel({
                 type="button"
                 onClick={onTogglePdf}
                 className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${isSelectedForPdf
-                    ? 'border border-[var(--accent)] bg-[var(--accent)] text-white shadow-[0_12px_24px_rgba(54,111,224,0.28)]'
-                    : 'border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--accent)]'
+                  ? 'border border-[var(--accent)] bg-[var(--accent)] text-white shadow-[0_12px_24px_rgba(54,111,224,0.28)]'
+                  : 'border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--accent)]'
                   }`}
               >
                 {isSelectedForPdf ? "PDF'den Çıkar" : "PDF'e Ekle"}
@@ -100,6 +101,13 @@ const PageImagePanel = memo(function PageImagePanel({
                 className="rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)]"
               >
                 Resmi Değiştir
+              </button>
+              <button
+                type="button"
+                onClick={onRotate}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)]"
+              >
+                Sola Döndür
               </button>
               <button
                 type="button"
@@ -138,6 +146,7 @@ export default function PageViewer() {
   const [isSavingNotes, setIsSavingNotes] = useState(false)
   const storagePath = useSettingsStore((state) => state.storagePath)
   const togglePdfItem = usePdfQueueStore((state) => state.toggleItem)
+  const removePdfItem = usePdfQueueStore((state) => state.removeItem)
   const pdfItems = usePdfQueueStore((state) => state.items)
   const { showToast } = useToast()
 
@@ -199,6 +208,9 @@ export default function PageViewer() {
     const result = await ipc.imagesDelete(numericId)
     setIsPendingDelete(false)
     if (result.success) {
+      if (isSelectedForPdf) {
+        removePdfItem(numericId)
+      }
       await loadPage()
       showToast({
         variant: 'success',
@@ -212,7 +224,7 @@ export default function PageViewer() {
       title: 'Görsel silinemedi',
       message: result.error || 'Görsel silinirken beklenmeyen bir hata oluştu.',
     })
-  }, [isPendingDelete, numericId, loadPage, showToast])
+  }, [isPendingDelete, numericId, loadPage, showToast, isSelectedForPdf, removePdfItem])
 
   const handleRevealImage = useCallback(
     async (imagePath) => {
@@ -253,6 +265,24 @@ export default function PageViewer() {
   )
 
   const handleUpload = useCallback(() => runImageUpload(), [runImageUpload])
+  const handleRotate = useCallback(async () => {
+    const result = await ipc.imagesRotate(numericId)
+    if (result.success) {
+      await loadPage()
+      showToast({
+        variant: 'success',
+        title: 'Görsel döndürüldü',
+        message: 'Resim başarıyla 90 derece sola döndürüldü.',
+      })
+    } else {
+      showToast({
+        variant: 'danger',
+        title: 'Döndürme başarısız',
+        message: result.error || 'Resim döndürülürken bir hata oluştu.',
+      })
+    }
+  }, [numericId, loadPage, showToast])
+
   const handleDelete = useCallback(() => setIsPendingDelete(true), [])
   const handleOpenViewer = useCallback(() => setIsViewerOpen(true), [])
   const handleReveal = useCallback(
@@ -311,6 +341,7 @@ export default function PageViewer() {
           imagePath={page?.image}
           updatedAt={page?.updated_at}
           onUpload={handleUpload}
+          onRotate={handleRotate}
           onDelete={handleDelete}
           onOpenViewer={handleOpenViewer}
           onReveal={handleReveal}

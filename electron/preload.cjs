@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('images:export', imagePaths, destFolder),
     getThumbnail: (imagePath) =>
       ipcRenderer.invoke('images:getThumbnail', imagePath),
+    rotate: (pageId) =>
+      ipcRenderer.invoke('images:rotate', pageId),
   },
   search: {
     query: (text, bookId) => ipcRenderer.invoke('search:query', text, bookId),
@@ -60,10 +62,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     verifyStoragePath: () => ipcRenderer.invoke('settings:verifyStoragePath'),
     scanStorageIntegrity: (payload) =>
       ipcRenderer.invoke('settings:scanStorageIntegrity', payload),
-      deleteOrphanFiles: (payload) =>
-        ipcRenderer.invoke('settings:deleteOrphanFiles', payload),
-      clearMissingRefs: (payload) =>
-        ipcRenderer.invoke('settings:clearMissingRefs', payload),
+    deleteOrphanFiles: (payload) =>
+      ipcRenderer.invoke('settings:deleteOrphanFiles', payload),
+    clearMissingRefs: (payload) =>
+      ipcRenderer.invoke('settings:clearMissingRefs', payload),
   },
   archive: {
     exportFull: () => ipcRenderer.invoke('archive:exportFull'),
