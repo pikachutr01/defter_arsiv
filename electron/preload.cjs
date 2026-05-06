@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     generate: (payload) => ipcRenderer.invoke('pdf:generate', payload),
     list: () => ipcRenderer.invoke('pdf:list'),
     open: (filePath) => ipcRenderer.invoke('pdf:open', filePath),
+    revealInFolder: (filePath) => ipcRenderer.invoke('pdf:revealInFolder', filePath),
     delete: (filePath) => ipcRenderer.invoke('pdf:delete', filePath),
   },
   settings: {
@@ -56,8 +57,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setStoragePath: (value) =>
       ipcRenderer.invoke('settings:setStoragePath', value),
     chooseStoragePath: () => ipcRenderer.invoke('settings:chooseStoragePath'),
-      scanStorageIntegrity: (payload) =>
-        ipcRenderer.invoke('settings:scanStorageIntegrity', payload),
+    verifyStoragePath: () => ipcRenderer.invoke('settings:verifyStoragePath'),
+    scanStorageIntegrity: (payload) =>
+      ipcRenderer.invoke('settings:scanStorageIntegrity', payload),
       deleteOrphanFiles: (payload) =>
         ipcRenderer.invoke('settings:deleteOrphanFiles', payload),
       clearMissingRefs: (payload) =>

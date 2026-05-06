@@ -83,7 +83,14 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
   ipcMain.handle('books:getAll', () => {
     try {
       const rows = db
-        .prepare('SELECT * FROM books ORDER BY created_at DESC')
+        .prepare(
+          `SELECT b.*,
+            COALESCE(SUM(p.side_a_uploaded + p.side_b_uploaded), 0) AS image_count
+           FROM books b
+           LEFT JOIN pages p ON p.book_id = b.id
+           GROUP BY b.id
+           ORDER BY b.created_at DESC`
+        )
         .all()
         .sort((left, right) => bookNameCollator.compare(left.name || '', right.name || ''))
       return { success: true, data: rows }

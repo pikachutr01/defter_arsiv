@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import useUiStore from '../../store/useUiStore.js'
+import useBookStore from '../../store/useBookStore.js'
+import usePdfQueueStore from '../../store/usePdfQueueStore.js'
 
 const navItems = [
   {
@@ -94,6 +96,8 @@ const navItems = [
 export default function Sidebar() {
   const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed)
   const toggleSidebar = useUiStore((state) => state.toggleSidebar)
+  const pdfItemsCount = usePdfQueueStore((state) => state.items.length)
+  const booksCount = useBookStore((state) => state.books.length)
 
   return (
     <aside
@@ -155,14 +159,36 @@ export default function Sidebar() {
             }
             title={isSidebarCollapsed ? item.label : undefined}
           >
-            <span className="shrink-0">{item.icon}</span>
+            <span className="shrink-0 relative">
+              {item.icon}
+              {item.to === '/pdf-export' && pdfItemsCount > 0 && isSidebarCollapsed && (
+                <span className="absolute -right-2 -top-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--danger)] px-1 text-[9px] font-bold text-white shadow-sm">
+                  {pdfItemsCount}
+                </span>
+              )}
+              {item.to === '/' && booksCount > 0 && isSidebarCollapsed && (
+                <span className="absolute -right-2 -top-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] px-1 text-[9px] font-bold text-[var(--text-muted)] shadow-sm">
+                  {booksCount}
+                </span>
+              )}
+            </span>
             <span
-              className={`overflow-hidden whitespace-nowrap text-sm transition-all duration-300 ${
+              className={`flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-300 ${
                 isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'
               }`}
             >
               {item.label}
             </span>
+            {item.to === '/pdf-export' && pdfItemsCount > 0 && !isSidebarCollapsed && (
+              <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--danger)] px-1.5 text-[10px] font-bold text-white shadow-sm">
+                {pdfItemsCount}
+              </span>
+            )}
+            {item.to === '/' && booksCount > 0 && !isSidebarCollapsed && (
+              <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] px-1.5 text-[10px] font-bold text-[var(--text-muted)] shadow-sm">
+                {booksCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

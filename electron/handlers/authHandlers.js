@@ -122,7 +122,10 @@ export const registerAuthHandlers = ({ ipcMain, db }) => {
 
       const newHash = await bcrypt.hash(newPassword, 10)
       setSetting(db, 'auth_password_hash', newHash)
-      return { success: true }
+      
+      const currentUsername = getSetting(db, 'auth_username') || 'admin'
+      
+      return { success: true, username: currentUsername }
     } catch (error) {
       return { success: false, error: error.message }
     }

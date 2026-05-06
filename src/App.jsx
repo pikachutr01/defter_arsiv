@@ -1,5 +1,6 @@
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
+import { ipc } from './utils/ipc.js'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import Sidebar from './components/layout/Sidebar.jsx'
 import TopBar from './components/layout/TopBar.jsx'
@@ -16,10 +17,26 @@ import useThemeStore from './store/useThemeStore.js'
 
 function AppLayout() {
   const fetchStoragePath = useSettingsStore((state) => state.fetchStoragePath)
+  const navigate = useNavigate()
 
   useEffect(() => {
-    fetchStoragePath()
-  }, [fetchStoragePath])
+    let isMounted = true
+
+    const verifyAndFetch = async () => {
+      const verifyResult = await ipc.settingsVerifyStoragePath()
+      await fetchStoragePath()
+
+      if (isMounted && verifyResult.success && !verifyResult.valid) {
+        navigate('/settings', { state: { storageError: true } })
+      }
+    }
+
+    verifyAndFetch()
+
+    return () => {
+      isMounted = false
+    }
+  }, [fetchStoragePath, navigate])
 
   return (
     <div className="min-h-screen text-[var(--text-primary)]">

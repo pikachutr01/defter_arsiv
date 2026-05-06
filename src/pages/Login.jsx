@@ -66,7 +66,10 @@ export default function Login() {
     setIsResetting(false)
 
     if (result.success) {
-      setResetStatus({ type: 'success', message: 'Sifre sifirlandi. Giris yapabilirsin.' })
+      setResetStatus({ 
+        type: 'success', 
+        message: `Şifre sıfırlandı. Kullanıcı adınız: ${result.username}, giriş yapabilirsiniz.` 
+      })
       setResetToken('')
       setResetPassword('')
       setResetConfirm('')

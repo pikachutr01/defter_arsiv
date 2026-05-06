@@ -52,7 +52,7 @@ export default function PageCard({ page, onSelect }) {
       type="button"
       onClick={() => onSelect(page)}
       style={appearance.style}
-      className={`flex flex-col gap-3 rounded-2xl border bg-[var(--bg-card)] p-4 text-left transition ${appearance.className}`}
+      className={`flex h-full w-full flex-col gap-3 rounded-2xl border bg-[var(--bg-card)] p-4 text-left transition ${appearance.className}`}
     >
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">

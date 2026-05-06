@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import useBookStore from '../store/useBookStore.js'
 import usePageStore from '../store/usePageStore.js'
@@ -9,65 +9,74 @@ import BookForm from '../components/books/BookForm.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
 import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
 
+const FILTERS = [
+  { value: 'all', label: 'Tümü' },
+  { value: 'with', label: 'Fotoğraflı' },
+  { value: 'missing', label: 'Eksik' },
+]
+
 export default function BookDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const bookId = Number(id)
+
   const books = useBookStore((state) => state.books)
   const updateBook = useBookStore((state) => state.updateBook)
   const deleteBook = useBookStore((state) => state.deleteBook)
   const pages = usePageStore((state) => state.pages)
   const loadPagesByBook = usePageStore((state) => state.loadPagesByBook)
+
   const [filter, setFilter] = useState('all')
   const [fetchedBook, setFetchedBook] = useState(null)
-  const [bookNotesDraft, setBookNotesDraft] = useState('')
-  const [hasBookNotesDraft, setHasBookNotesDraft] = useState(false)
+  // null → taslak yok, string → kullanıcı düzenleme yaptı
+  const [bookNotesDraft, setBookNotesDraft] = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const { showToast } = useToast()
 
   const cachedBook = useMemo(
-    () => books.find((item) => item.id === bookId) || null,
+    () => books.find((item) => item.id === bookId) ?? null,
     [bookId, books]
   )
 
-  const book =
-    cachedBook?.id === bookId
-      ? cachedBook
-      : fetchedBook?.id === bookId
-        ? fetchedBook
-        : null
+  const book = useMemo(
+    () =>
+      cachedBook?.id === bookId
+        ? cachedBook
+        : fetchedBook?.id === bookId
+          ? fetchedBook
+          : null,
+    [bookId, cachedBook, fetchedBook]
+  )
 
-  const bookNotes = hasBookNotesDraft ? bookNotesDraft : book?.book_notes || ''
+  const bookNotes = bookNotesDraft ?? book?.book_notes ?? ''
 
   useEffect(() => {
-    if (bookId) {
-      loadPagesByBook(bookId)
-    }
+    if (bookId) loadPagesByBook(bookId)
   }, [bookId, loadPagesByBook])
 
   useEffect(() => {
-    if (!bookId || cachedBook) {
-      return
-    }
-
+    if (!bookId || cachedBook) return
     let isMounted = true
-
-    const loadBook = async () => {
-      const result = await ipc.booksGetById(bookId)
-      if (isMounted && result.success) {
-        setFetchedBook(result.data)
-      }
-    }
-
-    loadBook()
-
+    ipc.booksGetById(bookId).then((result) => {
+      if (isMounted && result.success) setFetchedBook(result.data)
+    })
     return () => {
       isMounted = false
     }
   }, [bookId, cachedBook])
 
-  const handleSaveNotes = async () => {
+  const filteredPages = useMemo(() => {
+    if (filter === 'with') {
+      return pages.filter((p) => p.side_a_uploaded === 1 || p.side_b_uploaded === 1)
+    }
+    if (filter === 'missing') {
+      return pages.filter((p) => p.side_a_uploaded === 0 || p.side_b_uploaded === 0)
+    }
+    return pages
+  }, [filter, pages])
+
+  const handleSaveNotes = useCallback(async () => {
     if (!book) return
     const payload = {
       name: book.name,
@@ -80,8 +89,7 @@ export default function BookDetail() {
     const result = await updateBook(bookId, payload)
     if (result?.success) {
       setFetchedBook(result.data)
-      setBookNotesDraft('')
-      setHasBookNotesDraft(false)
+      setBookNotesDraft(null)
       showToast({
         variant: 'success',
         title: 'Notlar kaydedildi',
@@ -89,21 +97,19 @@ export default function BookDetail() {
       })
       return
     }
-
     showToast({
       variant: 'danger',
       title: 'Kayıt başarısız',
       message: result?.error || 'Cilt notu kaydedilemedi.',
     })
-  }
+  }, [book, bookId, bookNotes, updateBook, showToast])
 
-  const handleUpdateBook = async (payload) => {
+  const handleUpdateBook = useCallback(async (payload) => {
     const result = await updateBook(bookId, payload)
     if (result.success) {
       setFetchedBook(result.data)
       setShowEditForm(false)
-      setBookNotesDraft('')
-      setHasBookNotesDraft(false)
+      setBookNotesDraft(null)
       showToast({
         variant: 'success',
         title: 'Cilt güncellendi',
@@ -111,23 +117,18 @@ export default function BookDetail() {
       })
       return
     }
-
     showToast({
       variant: 'danger',
       title: 'Güncelleme başarısız',
       message: result.error || 'Cilt bilgileri güncellenemedi.',
     })
-  }
+  }, [bookId, updateBook, showToast])
 
-  const handleDeleteBook = async () => {
-    if (!book) {
-      return
-    }
-
-    const bookName = book.name
+  const handleDeleteBook = useCallback(async () => {
+    if (!book) return
+    const { name: bookName } = book
     const result = await deleteBook(bookId)
     setShowDeleteConfirm(false)
-
     if (result.success) {
       showToast({
         variant: 'success',
@@ -137,27 +138,27 @@ export default function BookDetail() {
       navigate('/')
       return
     }
-
     showToast({
       variant: 'danger',
       title: 'Cilt silinemedi',
       message: result.error || 'Cilt silinirken beklenmeyen bir hata oluştu.',
     })
-  }
+  }, [book, bookId, deleteBook, navigate, showToast])
 
-  const filteredPages = useMemo(() => {
-    if (filter === 'with') {
-      return pages.filter(
-        (page) => page.side_a_uploaded === 1 || page.side_b_uploaded === 1
-      )
-    }
-    if (filter === 'missing') {
-      return pages.filter(
-        (page) => page.side_a_uploaded === 0 || page.side_b_uploaded === 0
-      )
-    }
-    return pages
-  }, [filter, pages])
+  const handleNotesChange = useCallback((event) => {
+    setBookNotesDraft(event.target.value)
+  }, [])
+
+  const handleSelectPage = useCallback(
+    (page) => navigate(`/books/${bookId}/pages/${page.id}`),
+    [navigate, bookId]
+  )
+
+  const goBack = useCallback(() => navigate('/'), [navigate])
+  const openEditForm = useCallback(() => setShowEditForm(true), [])
+  const closeEditForm = useCallback(() => setShowEditForm(false), [])
+  const openDeleteConfirm = useCallback(() => setShowDeleteConfirm(true), [])
+  const closeDeleteConfirm = useCallback(() => setShowDeleteConfirm(false), [])
 
   return (
     <section className="space-y-6">
@@ -166,7 +167,7 @@ export default function BookDetail() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={goBack}
               className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] p-2 text-[var(--text-primary)] transition hover:border-[var(--accent)]"
               title="Geri"
             >
@@ -186,37 +187,33 @@ export default function BookDetail() {
             Sayfaları düzenle ve fotoğrafları yükle.
           </p>
         </div>
+
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setShowEditForm(true)}
+            onClick={openEditForm}
             className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs text-[var(--text-primary)] transition hover:border-[var(--accent)]"
           >
             Cildi Düzenle
           </button>
           <button
             type="button"
-            onClick={() => setShowDeleteConfirm(true)}
+            onClick={openDeleteConfirm}
             className="rounded-lg border border-[var(--danger-border)] px-4 py-2 text-xs text-[var(--text-primary)] transition hover:border-[var(--danger-strong)]"
           >
             Cildi Sil
           </button>
-          {['all', 'with', 'missing'].map((value) => (
+          {FILTERS.map(({ value, label }) => (
             <button
               key={value}
               type="button"
               onClick={() => setFilter(value)}
-              className={`rounded-lg px-4 py-2 text-xs transition ${
-                filter === value
+              className={`rounded-lg px-4 py-2 text-xs transition ${filter === value
                   ? 'bg-[var(--accent-dim)] text-[var(--text-primary)]'
                   : 'border border-[var(--border)] text-[var(--text-muted)]'
-              }`}
+                }`}
             >
-              {value === 'all'
-                ? 'Tümü'
-                : value === 'with'
-                  ? 'Fotoğraflı'
-                  : 'Eksik'}
+              {label}
             </button>
           ))}
         </div>
@@ -228,17 +225,15 @@ export default function BookDetail() {
           <button
             type="button"
             onClick={handleSaveNotes}
-            className="rounded-lg bg-[var(--accent)] px-3 py-2 text-xs text-white"
+            disabled={bookNotesDraft === null}
+            className="rounded-lg bg-[var(--accent)] px-3 py-2 text-xs text-white transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             Notu Kaydet
           </button>
         </div>
         <textarea
           value={bookNotes}
-          onChange={(event) => {
-            setBookNotesDraft(event.target.value)
-            setHasBookNotesDraft(true)
-          }}
+          onChange={handleNotesChange}
           rows={4}
           placeholder="Cilde özel not"
           className="mt-3 w-full rounded-xl border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)]"
@@ -251,25 +246,18 @@ export default function BookDetail() {
           description="Bu ciltte henüz sayfa kaydı yok."
         />
       ) : (
-        <PageGrid
-          pages={filteredPages}
-          onSelect={(page) => navigate(`/books/${bookId}/pages/${page.id}`)}
-        />
+        <PageGrid pages={filteredPages} onSelect={handleSelectPage} />
       )}
 
       {showEditForm && book ? (
-        <BookForm
-          book={book}
-          onClose={() => setShowEditForm(false)}
-          onSubmit={handleUpdateBook}
-        />
+        <BookForm book={book} onClose={closeEditForm} onSubmit={handleUpdateBook} />
       ) : null}
 
       {showDeleteConfirm && book ? (
         <ConfirmDialog
           title="Cildi Sil"
           message={`${book.name} ve ona bağlı tüm sayfalar silinecek. Devam etmek istiyor musun?`}
-          onCancel={() => setShowDeleteConfirm(false)}
+          onCancel={closeDeleteConfirm}
           onConfirm={handleDeleteBook}
         />
       ) : null}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import Modal from '../shared/Modal.jsx'
 import { ipc } from '../../utils/ipc.js'
 import useSettingsStore from '../../store/useSettingsStore.js'
@@ -13,61 +13,55 @@ const buildInitialState = (book) => ({
 
 export default function BookForm({ book = null, onClose, onSubmit }) {
   const storagePath = useSettingsStore((state) => state.storagePath)
-  const [formState, setFormState] = useState(buildInitialState(book))
+  const [formState, setFormState] = useState(() => buildInitialState(book))
   const [coverSourcePath, setCoverSourcePath] = useState(null)
   const [removeCover, setRemoveCover] = useState(false)
 
   const previewPath = useMemo(() => {
-    if (coverSourcePath) {
-      return coverSourcePath
-    }
-
-    if (removeCover) {
-      return null
-    }
-
+    if (coverSourcePath) return coverSourcePath
+    if (removeCover) return null
     return book?.cover_image || null
   }, [book?.cover_image, coverSourcePath, removeCover])
 
   const previewUrl = previewPath ? toLocalAssetUrl(storagePath, previewPath) : null
 
-  const handleChange = (event) => {
+  const handleChange = useCallback((event) => {
     const { name, value } = event.target
     setFormState((prev) => ({
       ...prev,
       [name]: name === 'total_pages' ? Number(value) : value,
     }))
-  }
+  }, [])
 
-  const handleChooseCover = async () => {
+  const handleChooseCover = useCallback(async () => {
     const result = await ipc.booksChooseCover()
-    if (!result.success) {
-      return
-    }
-
+    if (!result.success) return
     setCoverSourcePath(result.data)
     setRemoveCover(false)
-  }
+  }, [])
 
-  const handleRemoveCover = () => {
+  const handleRemoveCover = useCallback(() => {
     setCoverSourcePath(null)
     setRemoveCover(true)
-  }
+  }, [])
 
-  const handleSubmit = (event) => {
-    event.preventDefault()
-    onSubmit({
-      ...formState,
-      cover_source_path: coverSourcePath,
-      remove_cover: removeCover,
-    })
-  }
+  const handleSubmit = useCallback(
+    (event) => {
+      event.preventDefault()
+      onSubmit({
+        ...formState,
+        cover_source_path: coverSourcePath,
+        remove_cover: removeCover,
+      })
+    },
+    [onSubmit, formState, coverSourcePath, removeCover]
+  )
 
   return (
     <Modal
       title={book ? 'Cildi Düzenle' : 'Yeni Cilt'}
       onClose={onClose}
-      panelClassName="max-w-[85vw]"
+      panelClassName="max-w-[75vw] max-h-[90vh] overflow-y-auto"
     >
       <form className="grid gap-8 lg:grid-cols-[1.45fr_1fr]" onSubmit={handleSubmit}>
         <div className="flex flex-col gap-4">

@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { dialog } from 'electron'
+import crypto from 'crypto'
 import { ensureStorageFolders, getDefaultStoragePath } from '../db.js'
 
 const getSetting = (db, key) =>
@@ -10,6 +11,24 @@ const setSetting = (db, key, value) => {
   db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   ).run(key, value)
+}
+
+const ensureStorageId = (db, storagePath) => {
+  let storageId = getSetting(db, 'storage_id')
+  if (!storageId) {
+    storageId = crypto.randomUUID()
+    setSetting(db, 'storage_id', storageId)
+  }
+
+  const idFilePath = path.join(storagePath, '.defter_arsiv_id')
+  if (!fs.existsSync(idFilePath)) {
+    fs.writeFileSync(idFilePath, storageId, 'utf8')
+  } else {
+    const existingId = fs.readFileSync(idFilePath, 'utf8').trim()
+    if (existingId !== storageId) {
+      setSetting(db, 'storage_id', existingId)
+    }
+  }
 }
 
 const buildFallbackStoragePath = (app) =>
@@ -123,6 +142,7 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
       }
 
       ensureStorageFolders(storagePath)
+      ensureStorageId(db, storagePath)
       setSetting(db, 'storage_path', storagePath)
       return { success: true, data: storagePath }
     } catch (error) {
@@ -147,9 +167,48 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
 
       const selectedPath = result.filePaths[0]
       ensureStorageFolders(selectedPath)
+      ensureStorageId(db, selectedPath)
       setSetting(db, 'storage_path', selectedPath)
 
       return { success: true, data: selectedPath }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('settings:verifyStoragePath', () => {
+    try {
+      const storagePath = getSetting(db, 'storage_path')
+      if (!storagePath) {
+        return { success: true, valid: true }
+      }
+
+      if (fs.existsSync(storagePath)) {
+        return { success: true, valid: true }
+      }
+
+      const storageId = getSetting(db, 'storage_id')
+      if (!storageId) {
+        return { success: true, valid: false }
+      }
+
+      const pathWithoutDrive = storagePath.substring(storagePath.indexOf(':') + 1)
+      const drives = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+      
+      for (const drive of drives) {
+        const candidatePath = `${drive}:${pathWithoutDrive}`
+        const idFilePath = path.join(candidatePath, '.defter_arsiv_id')
+        
+        if (fs.existsSync(idFilePath)) {
+          const fileId = fs.readFileSync(idFilePath, 'utf8').trim()
+          if (fileId === storageId) {
+            setSetting(db, 'storage_path', candidatePath)
+            return { success: true, valid: true, autoRecovered: true, newPath: candidatePath }
+          }
+        }
+      }
+
+      return { success: true, valid: false }
     } catch (error) {
       return { success: false, error: error.message }
     }

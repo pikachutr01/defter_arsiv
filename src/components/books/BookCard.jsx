@@ -1,10 +1,11 @@
 import BookCover from './BookCover.jsx'
 
-export default function BookCard({ book, onSelect, onEdit, onDelete }) {
+export default function BookCard({ book, onSelect, onEdit, onDelete, className = '' }) {
   const totalPages = book.total_pages || 0
+  const imageCount = book.image_count ?? 0
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:border-[var(--accent)]">
+    <div className={`group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:border-[var(--accent)] ${className}`}>
       <button type="button" onClick={() => onSelect(book)} className="text-left">
         <BookCover coverPath={book.cover_image} title={book.name} />
       </button>
@@ -37,8 +38,14 @@ export default function BookCard({ book, onSelect, onEdit, onDelete }) {
         <p className="text-xs text-[var(--text-muted)]">
           {book.description || 'Açıklama eklenmedi'}
         </p>
-        <div className="mt-3 text-xs text-[var(--text-muted)]">
-          Toplam sayfa: <span className="text-[var(--text-primary)]">{totalPages}</span>
+        <div className="mt-3 flex items-center gap-3 text-xs text-[var(--text-muted)]">
+          <span>
+            Toplam sayfa: <span className="text-[var(--text-primary)]">{totalPages}</span>
+          </span>
+          <span className="opacity-30">|</span>
+          <span>
+            Resim: <span className="text-[var(--text-primary)]">{imageCount}</span>
+          </span>
         </div>
       </div>
     </div>

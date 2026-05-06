@@ -68,7 +68,7 @@ const waitForWriteStream = (stream) =>
     stream.on('error', reject)
   })
 
-export const registerPdfHandlers = ({ ipcMain, db, app }) => {
+export const registerPdfHandlers = ({ ipcMain, db }) => {
   ipcMain.handle('pdf:generate', async (_event, payload) => {
     let finalPdfPath = null
 
@@ -107,7 +107,13 @@ export const registerPdfHandlers = ({ ipcMain, db, app }) => {
       const writeStream = fs.createWriteStream(finalPdfPath)
       doc.pipe(writeStream)
 
-      selections.forEach((item) => {
+      for (let i = 0; i < selections.length; i++) {
+        if (i > 0 && i % 50 === 0) {
+          // Her 50 sayfada bir Garbage Collection'a ve ana döngüye nefes aldır.
+          await new Promise((resolve) => setImmediate(resolve))
+        }
+
+        const item = selections[i]
         doc.addPage({ size: 'A4', margin: 40 })
 
         const PAGE_W = 520   // A4 - 2*40 margin
@@ -160,21 +166,15 @@ export const registerPdfHandlers = ({ ipcMain, db, app }) => {
           doc.fontSize(10).fillColor('#4a5c78')
           doc.text(item.note.trim(), { width: PAGE_W, align: 'center' })
         }
-      })
+      }
 
       doc.end()
       await waitForWriteStream(writeStream)
-
-      const downloadsPath = app.getPath('downloads')
-      fs.mkdirSync(downloadsPath, { recursive: true })
-      const downloadCopyPath = buildUniqueFilePath(downloadsPath, finalFileName)
-      fs.copyFileSync(finalPdfPath, downloadCopyPath)
 
       return {
         success: true,
         data: {
           filePath: finalPdfPath,
-          downloadPath: downloadCopyPath,
           fileName: finalFileName,
         },
       }
@@ -230,6 +230,19 @@ export const registerPdfHandlers = ({ ipcMain, db, app }) => {
         return { success: false, error: result }
       }
 
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('pdf:revealInFolder', (_event, filePath) => {
+    try {
+      if (!filePath || !fs.existsSync(filePath)) {
+        return { success: false, error: 'PDF bulunamadı.' }
+      }
+
+      shell.showItemInFolder(filePath)
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

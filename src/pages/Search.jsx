@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ipc } from '../utils/ipc.js'
 import SearchBar from '../components/shared/SearchBar.jsx'
@@ -6,60 +6,70 @@ import EmptyState from '../components/shared/EmptyState.jsx'
 import useSettingsStore from '../store/useSettingsStore.js'
 import { toLocalAssetUrl } from '../utils/paths.js'
 
+const DEBOUNCE_MS = 300
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function HighlightedText({ text, query, className = '' }) {
-  if (!text) {
-    return null
-  }
+const HighlightedText = memo(function HighlightedText({ text, query, className = '' }) {
+  if (!text) return null
 
-  if (!query.trim()) {
-    return <span className={className}>{text}</span>
-  }
+  const trimmed = query.trim()
+  if (!trimmed) return <span className={className}>{text}</span>
 
-  const pattern = new RegExp(`(${escapeRegExp(query.trim())})`, 'ig')
+  const pattern = new RegExp(`(${escapeRegExp(trimmed)})`, 'ig')
   const parts = text.split(pattern)
+  const lowerTrimmed = trimmed.toLowerCase()
 
   return (
     <span className={className}>
       {parts.map((part, index) =>
-        part.toLowerCase() === query.trim().toLowerCase() ? (
+        part.toLowerCase() === lowerTrimmed ? (
           <mark
-            key={`${part}-${index}`}
+            key={index}
             className="rounded bg-[rgba(79,142,247,0.18)] px-1 text-[var(--text-primary)]"
           >
             {part}
           </mark>
         ) : (
-          <span key={`${part}-${index}`}>{part}</span>
+          <span key={index}>{part}</span>
         )
       )}
     </span>
   )
-}
+})
 
-function ResultBadge({ type, children }) {
+const ResultBadge = memo(function ResultBadge({ type, children }) {
   const isBook = type === 'book'
-
   return (
     <span
-      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
-        isBook
+      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${isBook
           ? 'bg-[rgba(79,142,247,0.16)] text-[var(--accent)]'
           : 'bg-[rgba(52,201,122,0.14)] text-[var(--success)]'
-      }`}
+        }`}
     >
       {children}
     </span>
   )
-}
+})
 
-function BookResultCard({ item, query, onClick, storagePath }) {
+const BookResultCard = memo(function BookResultCard({ item, query, onClick, storagePath }) {
   const coverUrl = item.cover_image ? toLocalAssetUrl(storagePath, item.cover_image) : null
-  const descriptionSource = item.match_sources?.find((source) => source.label === 'Açıklama')
-  const noteSource = item.match_sources?.find((source) => source.label === 'Cilt Notu')
+
+  // İki ayrı .find() yerine tek geçişte türet
+  const { descriptionSource, noteSource } = useMemo(() => {
+    let desc = null
+    let note = null
+    for (const source of item.match_sources || []) {
+      if (source.label === 'Açıklama') desc = source
+      else if (source.label === 'Cilt Notu') note = source
+      if (desc && note) break
+    }
+    return { descriptionSource: desc, noteSource: note }
+  }, [item.match_sources])
+
+  const descriptionText = descriptionSource?.text || item.description || null
 
   return (
     <button
@@ -88,13 +98,9 @@ function BookResultCard({ item, query, onClick, storagePath }) {
           query={query}
           className="text-base font-semibold text-[var(--text-primary)]"
         />
-        {descriptionSource?.text ? (
+        {descriptionText ? (
           <div className="text-sm text-[var(--text-muted)]">
-            <HighlightedText text={descriptionSource.text} query={query} />
-          </div>
-        ) : item.description ? (
-          <div className="text-sm text-[var(--text-muted)]">
-            <HighlightedText text={item.description} query={query} />
+            <HighlightedText text={descriptionText} query={query} />
           </div>
         ) : null}
         {noteSource?.text ? (
@@ -110,9 +116,9 @@ function BookResultCard({ item, query, onClick, storagePath }) {
       </div>
     </button>
   )
-}
+})
 
-function PageResultCard({ item, query, onClick }) {
+const PageResultCard = memo(function PageResultCard({ item, query, onClick }) {
   return (
     <button
       type="button"
@@ -125,7 +131,6 @@ function PageResultCard({ item, query, onClick }) {
       <div className="pr-20 text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
         {item.book_name} / Sayfa {item.page_number}
       </div>
-
       <div className="mt-3">
         <HighlightedText
           text={`${item.book_name} - Sayfa ${item.page_number}`}
@@ -133,11 +138,10 @@ function PageResultCard({ item, query, onClick }) {
           className="text-base font-semibold text-[var(--text-primary)]"
         />
       </div>
-
       <div className="mt-4 flex flex-col gap-2">
-        {item.match_sources?.map((source) => (
+        {item.match_sources?.map((source, index) => (
           <div
-            key={`${item.id}-${source.label}-${source.text}`}
+            key={index}
             className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-2.5"
           >
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -151,28 +155,43 @@ function PageResultCard({ item, query, onClick }) {
       </div>
     </button>
   )
-}
+})
 
 export default function Search() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const navigate = useNavigate()
   const storagePath = useSettingsStore((state) => state.storagePath)
+  const debounceRef = useRef(null)
 
-  const handleSearch = async (text) => {
-    setQuery(text)
+  const runSearch = useCallback(async (text) => {
     if (text.trim().length < 2) {
       setResults([])
       return
     }
-
     const result = await ipc.searchQuery(text)
     if (result.success) {
       setResults(result.data || [])
     }
-  }
+  }, [])
 
-  const groupedResults = useMemo(() => results, [results])
+  const handleSearch = useCallback(
+    (text) => {
+      setQuery(text)
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => runSearch(text), DEBOUNCE_MS)
+    },
+    [runSearch]
+  )
+
+  // Unmount'ta bekleyen timer'ı temizle
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
+  const isEmpty = query.trim().length < 2 || results.length === 0
 
   return (
     <section className="space-y-6">
@@ -188,7 +207,7 @@ export default function Search() {
         placeholder="Cilt, açıklama, not veya sayfa numarası ara..."
       />
 
-      {groupedResults.length === 0 ? (
+      {isEmpty ? (
         <EmptyState
           title={query.trim().length < 2 ? 'Arama yapmaya hazır' : 'Sonuç bulunamadı'}
           description={
@@ -199,7 +218,7 @@ export default function Search() {
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {groupedResults.map((item) =>
+          {results.map((item) =>
             item.result_type === 'book' ? (
               <BookResultCard
                 key={item.id}

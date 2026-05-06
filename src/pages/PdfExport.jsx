@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, memo } from 'react'
 import Modal from '../components/shared/Modal.jsx'
 import EmptyState from '../components/shared/EmptyState.jsx'
 import ImageViewer from '../components/images/ImageViewer.jsx'
@@ -40,8 +40,7 @@ function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving, clea
     <Modal title="PDF Adı" onClose={onClose} panelClassName="max-w-xl">
       <div className="space-y-4">
         <p className="text-sm text-[var(--text-muted)]">
-          PDF dosyasına verilecek adı yaz. Dosya hem arşiv klasörüne hem de
-          İndirilenler klasörüne kaydedilecek.
+          PDF dosyasına verilecek adı yaz. Dosya pdf klasörüne kaydedilecek.
         </p>
         <input
           autoFocus
@@ -95,7 +94,7 @@ function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving, clea
   )
 }
 
-function PdfQueueCard({
+const PdfQueueCard = memo(function PdfQueueCard({
   item,
   index,
   storagePath,
@@ -187,9 +186,9 @@ function PdfQueueCard({
       </p>
     </article>
   )
-}
+})
 
-function PdfSavedCard({ item, onOpen, onDelete }) {
+function PdfSavedCard({ item, onOpen, onFind, onDelete }) {
   return (
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-start gap-4">
@@ -230,6 +229,13 @@ function PdfSavedCard({ item, onOpen, onDelete }) {
           className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
         >
           Aç
+        </button>
+        <button
+          type="button"
+          onClick={onFind}
+          className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        >
+          Bul
         </button>
         <button
           type="button"
@@ -320,7 +326,7 @@ export default function PdfExport() {
       showToast({
         variant: 'success',
         title: 'PDF oluşturuldu',
-        message: `${result.data.fileName} kaydedildi ve İndirilenler klasörüne kopyalandı.`,
+        message: `${result.data.fileName} oluşturuldu ve kaydedildi.`,
       })
       return
     }
@@ -339,6 +345,17 @@ export default function PdfExport() {
         variant: 'danger',
         title: 'PDF açılamadı',
         message: result.error || 'PDF varsayılan uygulamada açılamadı.',
+      })
+    }
+  }
+
+  const handleFindPdf = async (filePath) => {
+    const result = await ipc.pdfRevealInFolder(filePath)
+    if (!result.success) {
+      showToast({
+        variant: 'danger',
+        title: 'Klasörde bulunamadı',
+        message: result.error || 'Dosya klasörde gösterilemedi.',
       })
     }
   }
@@ -470,6 +487,7 @@ export default function PdfExport() {
               key={item.id}
               item={item}
               onOpen={() => handleOpenPdf(item.filePath)}
+              onFind={() => handleFindPdf(item.filePath)}
               onDelete={() => setPendingDeletePdf(item)}
             />
           ))}

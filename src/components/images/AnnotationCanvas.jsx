@@ -196,7 +196,7 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
   }
 
   return (
-    <Modal title="Çizim Düzenleyici" onClose={onClose} panelClassName="max-w-[85vw] w-full">
+    <Modal title="Çizim Düzenleyici" onClose={onClose} panelClassName="max-w-[75vw] w-full">
       {/* Araç çubuğu */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3">
         {/* Araç seçimi */}
@@ -205,11 +205,10 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
             type="button"
             onClick={() => setTool(TOOLS.PEN)}
             title="Kalem"
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              tool === TOOLS.PEN
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${tool === TOOLS.PEN
                 ? 'bg-[var(--accent)] text-white'
                 : 'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}
+              }`}
           >
             ✏️ Kalem
           </button>
@@ -217,11 +216,10 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
             type="button"
             onClick={() => setTool(TOOLS.ERASER)}
             title="Silgi"
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              tool === TOOLS.ERASER
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${tool === TOOLS.ERASER
                 ? 'bg-[var(--accent)] text-white'
                 : 'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}
+              }`}
           >
             🧹 Silgi
           </button>
@@ -235,11 +233,10 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
               type="button"
               onClick={() => { setColor(c); setTool(TOOLS.PEN) }}
               style={{ backgroundColor: c }}
-              className={`h-6 w-6 rounded-full border-2 transition ${
-                color === c && tool === TOOLS.PEN
+              className={`h-6 w-6 rounded-full border-2 transition ${color === c && tool === TOOLS.PEN
                   ? 'border-[var(--accent)] scale-125'
                   : 'border-[var(--border)]'
-              }`}
+                }`}
             />
           ))}
           <input

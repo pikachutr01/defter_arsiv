@@ -3,8 +3,6 @@ import path from 'path'
 import sharp from 'sharp'
 import { dialog, shell } from 'electron'
 
-const MAX_IMAGE_WIDTH = 2200
-const MAX_IMAGE_HEIGHT = 2200
 const JPEG_QUALITY = 82
 
 const getStoragePath = (db) =>
@@ -65,12 +63,6 @@ const optimizeAndSaveImage = async (sourcePath, targetPath) => {
   }
 
   await pipeline
-    .resize({
-      width: MAX_IMAGE_WIDTH,
-      height: MAX_IMAGE_HEIGHT,
-      fit: 'inside',
-      withoutEnlargement: true,
-    })
     .jpeg({
       quality: JPEG_QUALITY,
       mozjpeg: true,
