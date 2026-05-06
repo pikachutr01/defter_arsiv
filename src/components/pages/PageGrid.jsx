@@ -11,14 +11,14 @@ const gridComponents = {
   ))
 }
 
-export default function PageGrid({ pages, onSelect }) {
+export default function PageGrid({ pages, onSelect, onViewImage }) {
   return (
     <VirtuosoGrid
       useWindowScroll
       data={pages}
       components={gridComponents}
       itemContent={(index, page) => (
-        <PageCard page={page} onSelect={onSelect} />
+        <PageCard page={page} onSelect={onSelect} onViewImage={onViewImage} />
       )}
     />
   )

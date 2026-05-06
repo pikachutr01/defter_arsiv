@@ -3,22 +3,30 @@ import path from 'path'
 import sharp from 'sharp'
 import { dialog } from 'electron'
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const COVER_MAX_SIZE = 1600
 const COVER_QUALITY = 80
+
 const bookNameCollator = new Intl.Collator('tr', {
   numeric: true,
   sensitivity: 'base',
 })
 
-const getStoragePath = (db) =>
-  db.prepare('SELECT value FROM settings WHERE key = ?').get('storage_path')
-    ?.value || null
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+let _cachedStoragePath = undefined
+const getStoragePath = (db) => {
+  if (_cachedStoragePath !== undefined) return _cachedStoragePath
+  _cachedStoragePath =
+    db.prepare('SELECT value FROM settings WHERE key = ?').get('storage_path')
+      ?.value ?? null
+  return _cachedStoragePath
+}
 
 const removeIfExists = (targetPath) => {
-  if (!targetPath) return
-  if (fs.existsSync(targetPath)) {
-    fs.rmSync(targetPath, { recursive: true, force: true })
-  }
+  if (!targetPath || !fs.existsSync(targetPath)) return
+  fs.rmSync(targetPath, { recursive: true, force: true })
 }
 
 const saveCoverImage = async (storagePath, bookId, sourcePath) => {
@@ -26,12 +34,14 @@ const saveCoverImage = async (storagePath, bookId, sourcePath) => {
   fs.mkdirSync(coversDir, { recursive: true })
 
   const targetPath = path.join(coversDir, `book_${bookId}.jpg`)
-  let pipeline = sharp(sourcePath, { failOn: 'none' }).rotate()
-  const metadata = await pipeline.metadata()
 
-  if (metadata.hasAlpha) {
-    pipeline = pipeline.flatten({ background: '#ffffff' })
-  }
+  // sharp instance'ı bir kez oluştur, metadata ve pipeline ayrı ayrı açılmasın
+  const instance = sharp(sourcePath, { failOn: 'none' }).rotate()
+  const metadata = await instance.metadata()
+
+  const pipeline = metadata.hasAlpha
+    ? instance.flatten({ background: '#ffffff' })
+    : instance
 
   await pipeline
     .resize({
@@ -53,11 +63,8 @@ const saveCoverImage = async (storagePath, bookId, sourcePath) => {
 
 const applyCoverChanges = async (db, bookId, data) => {
   const storagePath = getStoragePath(db)
-  if (!storagePath) {
-    return null
-  }
+  if (!storagePath) return null
 
-  const currentBook = db.prepare('SELECT cover_image FROM books WHERE id = ?').get(bookId)
   const coverPath = path.join(storagePath, 'covers', `book_${bookId}.jpg`)
 
   if (data.remove_cover) {
@@ -69,30 +76,61 @@ const applyCoverChanges = async (db, bookId, data) => {
   }
 
   if (data.cover_source_path) {
-    const relativeCoverPath = await saveCoverImage(storagePath, bookId, data.cover_source_path)
+    const relativeCoverPath = await saveCoverImage(
+      storagePath,
+      bookId,
+      data.cover_source_path
+    )
     db.prepare(
       'UPDATE books SET cover_image = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
     ).run(relativeCoverPath, bookId)
     return relativeCoverPath
   }
 
-  return currentBook?.cover_image || null
+  // Kapak değişikliği yoksa mevcut değeri tek sorguda al
+  return (
+    db.prepare('SELECT cover_image FROM books WHERE id = ?').get(bookId)
+      ?.cover_image ?? null
+  )
 }
 
+// ─── Prepared Statements (modül yüklenirken değil, handler register'da init edilir) ──
+
+const buildStatements = (db) => ({
+  getAllBooks: db.prepare(`
+    SELECT b.*,
+           COALESCE(SUM(p.is_uploaded), 0) AS image_count
+    FROM books b
+    LEFT JOIN pages p ON p.book_id = b.id
+    GROUP BY b.id
+    ORDER BY b.created_at DESC
+  `),
+  getById: db.prepare('SELECT * FROM books WHERE id = ?'),
+  checkDuplicateName: db.prepare(
+    'SELECT id FROM books WHERE name = ? COLLATE NOCASE AND id != ?'
+  ),
+  checkDuplicateNameNew: db.prepare(
+    'SELECT id FROM books WHERE name = ? COLLATE NOCASE'
+  ),
+  insertBook: db.prepare(
+    'INSERT INTO books (name, description, book_notes, total_pages, cover_image, storage_folder) VALUES (?, ?, ?, ?, ?, ?)'
+  ),
+  updateBook: db.prepare(
+    'UPDATE books SET name = ?, description = ?, book_notes = ?, total_pages = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ),
+  deleteBook: db.prepare('DELETE FROM books WHERE id = ?'),
+})
+
+// ─── IPC Handlers ────────────────────────────────────────────────────────────
+
 export const registerBookHandlers = ({ ipcMain, db }) => {
+  const stmt = buildStatements(db)
+
   ipcMain.handle('books:getAll', () => {
     try {
-      const rows = db
-        .prepare(
-          `SELECT b.*,
-            COALESCE(SUM(p.is_uploaded), 0) AS image_count
-           FROM books b
-           LEFT JOIN pages p ON p.book_id = b.id
-           GROUP BY b.id
-           ORDER BY b.created_at DESC`
-        )
+      const rows = stmt.getAllBooks
         .all()
-        .sort((left, right) => bookNameCollator.compare(left.name || '', right.name || ''))
+        .sort((a, b) => bookNameCollator.compare(a.name || '', b.name || ''))
       return { success: true, data: rows }
     } catch (error) {
       return { success: false, error: error.message }
@@ -101,7 +139,7 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
 
   ipcMain.handle('books:getById', (_event, id) => {
     try {
-      const row = db.prepare('SELECT * FROM books WHERE id = ?').get(id)
+      const row = stmt.getById.get(id)
       return { success: true, data: row }
     } catch (error) {
       return { success: false, error: error.message }
@@ -128,15 +166,15 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
 
   ipcMain.handle('books:create', async (_event, data) => {
     try {
-      const existing = db.prepare('SELECT id FROM books WHERE name = ? COLLATE NOCASE').get(data.name)
+      const existing = stmt.checkDuplicateNameNew.get(data.name)
       if (existing) {
-        return { success: false, error: 'Bu isimde bir cilt zaten var. Lütfen farklı bir isim girin.' }
+        return {
+          success: false,
+          error: 'Bu isimde bir cilt zaten var. Lütfen farklı bir isim girin.',
+        }
       }
 
-      const stmt = db.prepare(
-        'INSERT INTO books (name, description, book_notes, total_pages, cover_image, storage_folder) VALUES (?, ?, ?, ?, ?, ?)'
-      )
-      const result = stmt.run(
+      const result = stmt.insertBook.run(
         data.name,
         data.description || null,
         data.book_notes || null,
@@ -150,7 +188,7 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
         await applyCoverChanges(db, bookId, data)
       }
 
-      const book = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId)
+      const book = stmt.getById.get(bookId)
       return { success: true, data: book }
     } catch (error) {
       return { success: false, error: error.message }
@@ -159,18 +197,25 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
 
   ipcMain.handle('books:update', async (_event, id, data) => {
     try {
-      const existing = db.prepare('SELECT id FROM books WHERE name = ? COLLATE NOCASE AND id != ?').get(data.name, id)
+      const existing = stmt.checkDuplicateName.get(data.name, id)
       if (existing) {
-        return { success: false, error: 'Bu isimde bir cilt zaten var. Lütfen farklı bir isim girin.' }
+        return {
+          success: false,
+          error: 'Bu isimde bir cilt zaten var. Lütfen farklı bir isim girin.',
+        }
       }
 
-      db.prepare(
-        'UPDATE books SET name = ?, description = ?, book_notes = ?, total_pages = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-      ).run(data.name, data.description || null, data.book_notes || null, data.total_pages || 0, id)
+      stmt.updateBook.run(
+        data.name,
+        data.description || null,
+        data.book_notes || null,
+        data.total_pages || 0,
+        id
+      )
 
       await applyCoverChanges(db, id, data)
 
-      const book = db.prepare('SELECT * FROM books WHERE id = ?').get(id)
+      const book = stmt.getById.get(id)
       return { success: true, data: book }
     } catch (error) {
       return { success: false, error: error.message }
@@ -181,13 +226,11 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
     try {
       const storagePath = getStoragePath(db)
       if (storagePath) {
-        const coverPath = path.join(storagePath, 'covers', `book_${id}.jpg`)
-        const bookFolder = path.join(storagePath, 'books', `book_${id}`)
-        removeIfExists(coverPath)
-        removeIfExists(bookFolder)
+        removeIfExists(path.join(storagePath, 'covers', `book_${id}.jpg`))
+        removeIfExists(path.join(storagePath, 'books', `book_${id}`))
       }
 
-      db.prepare('DELETE FROM books WHERE id = ?').run(id)
+      stmt.deleteBook.run(id)
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

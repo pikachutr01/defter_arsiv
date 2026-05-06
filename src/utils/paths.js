@@ -10,9 +10,13 @@ export const resolveStoredPath = (storagePath, storedPath) => {
   return `${base}/${tail}`
 }
 
-export const toLocalAssetUrl = (storagePath, storedPath) => {
+export const toLocalAssetUrl = (storagePath, storedPath, t = null) => {
   const resolvedPath = resolveStoredPath(storagePath, storedPath)
   if (!resolvedPath) return null
 
-  return `local-file://asset?path=${encodeURIComponent(resolvedPath)}`
+  let url = `local-file://asset?path=${encodeURIComponent(resolvedPath)}`
+  if (t) {
+    url += `&t=${t}`
+  }
+  return url
 }

@@ -2,9 +2,9 @@ import Modal from '../shared/Modal.jsx'
 import useSettingsStore from '../../store/useSettingsStore.js'
 import { toLocalAssetUrl } from '../../utils/paths.js'
 
-export default function ImageViewer({ title, imagePath, onClose, panelClassName = 'max-w-6xl' }) {
+export default function ImageViewer({ title, imagePath, timestamp, onClose, panelClassName = 'max-w-6xl' }) {
   const storagePath = useSettingsStore((state) => state.storagePath)
-  const imageUrl = toLocalAssetUrl(storagePath, imagePath)
+  const imageUrl = toLocalAssetUrl(storagePath, imagePath, timestamp)
 
   return (
     <Modal title={title} onClose={onClose} panelClassName={panelClassName}>

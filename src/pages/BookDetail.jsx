@@ -8,6 +8,7 @@ import { ipc } from '../utils/ipc.js'
 import BookForm from '../components/books/BookForm.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
 import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
+import ImageViewer from '../components/images/ImageViewer.jsx'
 
 const FILTERS = [
   { value: 'all', label: 'Tümü' },
@@ -32,6 +33,7 @@ export default function BookDetail() {
   const [bookNotesDraft, setBookNotesDraft] = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [viewingImage, setViewingImage] = useState(null)
   const { showToast } = useToast()
 
   const cachedBook = useMemo(
@@ -246,7 +248,7 @@ export default function BookDetail() {
           description="Bu ciltte henüz sayfa kaydı yok."
         />
       ) : (
-        <PageGrid pages={filteredPages} onSelect={handleSelectPage} />
+        <PageGrid pages={filteredPages} onSelect={handleSelectPage} onViewImage={setViewingImage} />
       )}
 
       {showEditForm && book ? (
@@ -261,6 +263,15 @@ export default function BookDetail() {
           onConfirm={handleDeleteBook}
         />
       ) : null}
+
+      {viewingImage && (
+        <ImageViewer
+          title={`Sayfa ${viewingImage.page_number}`}
+          imagePath={viewingImage.image}
+          timestamp={viewingImage.updated_at ? new Date(viewingImage.updated_at).getTime() : null}
+          onClose={() => setViewingImage(null)}
+        />
+      )}
     </section>
   )
 }

@@ -37,6 +37,7 @@ function useDragDrop(onFileDrop) {
 
 const PageImagePanel = memo(function PageImagePanel({
   imagePath,
+  updatedAt,
   onUpload,
   onDelete,
   onOpenViewer,
@@ -46,7 +47,8 @@ const PageImagePanel = memo(function PageImagePanel({
   isSelectedForPdf,
   storagePath,
 }) {
-  const imageUrl = toLocalAssetUrl(storagePath, imagePath)
+  const timeParam = updatedAt ? new Date(updatedAt).getTime() : null
+  const imageUrl = toLocalAssetUrl(storagePath, imagePath, timeParam)
   const { isDragging, handleDragOver, handleDragLeave, handleDrop } = useDragDrop(onFileDrop)
 
   return (
@@ -307,6 +309,7 @@ export default function PageViewer() {
       <div className="grid gap-6">
         <PageImagePanel
           imagePath={page?.image}
+          updatedAt={page?.updated_at}
           onUpload={handleUpload}
           onDelete={handleDelete}
           onOpenViewer={handleOpenViewer}
@@ -343,6 +346,7 @@ export default function PageViewer() {
         <ImageViewer
           title="Görseli Görüntüle"
           imagePath={page.image}
+          timestamp={page?.updated_at ? new Date(page.updated_at).getTime() : null}
           onClose={closeViewer}
         />
       ) : null}

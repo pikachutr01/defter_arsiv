@@ -35,6 +35,69 @@ const buildPageResults = (rows) =>
     }
   })
 
+let _stmts = null
+const stmts = (db) => {
+  if (_stmts) return _stmts
+  _stmts = {
+    bookAll: db.prepare(`
+      SELECT id, name, description, book_notes, cover_image, total_pages
+      FROM books
+      WHERE (
+        name LIKE ?
+        OR COALESCE(description, '') LIKE ?
+        OR COALESCE(book_notes, '') LIKE ?
+      )
+      ORDER BY name COLLATE NOCASE ASC
+    `),
+    bookWithId: db.prepare(`
+      SELECT id, name, description, book_notes, cover_image, total_pages
+      FROM books
+      WHERE (
+        name LIKE ?
+        OR COALESCE(description, '') LIKE ?
+        OR COALESCE(book_notes, '') LIKE ?
+      )
+      AND id = ?
+      ORDER BY name COLLATE NOCASE ASC
+    `),
+    pageAll: db.prepare(`
+      SELECT pages.id, pages.book_id, pages.page_number, pages.page_notes,
+             books.name AS book_name
+      FROM pages
+      JOIN books ON pages.book_id = books.id
+      WHERE (COALESCE(pages.page_notes, '') LIKE ?)
+      ORDER BY books.name COLLATE NOCASE ASC, pages.page_number ASC
+    `),
+    pageWithNum: db.prepare(`
+      SELECT pages.id, pages.book_id, pages.page_number, pages.page_notes,
+             books.name AS book_name
+      FROM pages
+      JOIN books ON pages.book_id = books.id
+      WHERE (COALESCE(pages.page_notes, '') LIKE ? OR pages.page_number = ?)
+      ORDER BY books.name COLLATE NOCASE ASC, pages.page_number ASC
+    `),
+    pageAllWithId: db.prepare(`
+      SELECT pages.id, pages.book_id, pages.page_number, pages.page_notes,
+             books.name AS book_name
+      FROM pages
+      JOIN books ON pages.book_id = books.id
+      WHERE (COALESCE(pages.page_notes, '') LIKE ?)
+      AND books.id = ?
+      ORDER BY books.name COLLATE NOCASE ASC, pages.page_number ASC
+    `),
+    pageWithNumAndId: db.prepare(`
+      SELECT pages.id, pages.book_id, pages.page_number, pages.page_notes,
+             books.name AS book_name
+      FROM pages
+      JOIN books ON pages.book_id = books.id
+      WHERE (COALESCE(pages.page_notes, '') LIKE ? OR pages.page_number = ?)
+      AND books.id = ?
+      ORDER BY books.name COLLATE NOCASE ASC, pages.page_number ASC
+    `),
+  }
+  return _stmts
+}
+
 export const registerSearchHandlers = ({ ipcMain, db }) => {
   ipcMain.handle('search:query', (_event, text, bookId) => {
     try {
@@ -45,47 +108,27 @@ export const registerSearchHandlers = ({ ipcMain, db }) => {
       const trimmed = text.trim()
       const likeValue = `%${trimmed}%`
       const pageNumber = Number.parseInt(trimmed, 10)
+      const hasPageNumber = !Number.isNaN(pageNumber)
 
-      let bookSql = `
-        SELECT id, name, description, book_notes, cover_image, total_pages
-        FROM books
-        WHERE (
-          name LIKE ?
-          OR COALESCE(description, '') LIKE ?
-          OR COALESCE(book_notes, '') LIKE ?
-        )
-      `
-      const bookParams = [likeValue, likeValue, likeValue]
-
-      let pageSql = `
-        SELECT pages.id, pages.book_id, pages.page_number, pages.page_notes,
-               books.name AS book_name
-        FROM pages
-        JOIN books ON pages.book_id = books.id
-        WHERE (
-          COALESCE(pages.page_notes, '') LIKE ?
-      `
-      const pageParams = [likeValue]
-
-      if (!Number.isNaN(pageNumber)) {
-        pageSql += ' OR pages.page_number = ?'
-        pageParams.push(pageNumber)
-      }
-
-      pageSql += ')'
+      const s = stmts(db)
+      let bookRows = []
+      let pageRows = []
 
       if (bookId) {
-        bookSql += ' AND id = ?'
-        pageSql += ' AND books.id = ?'
-        bookParams.push(bookId)
-        pageParams.push(bookId)
+        bookRows = s.bookWithId.all(likeValue, likeValue, likeValue, bookId)
+        if (hasPageNumber) {
+          pageRows = s.pageWithNumAndId.all(likeValue, pageNumber, bookId)
+        } else {
+          pageRows = s.pageAllWithId.all(likeValue, bookId)
+        }
+      } else {
+        bookRows = s.bookAll.all(likeValue, likeValue, likeValue)
+        if (hasPageNumber) {
+          pageRows = s.pageWithNum.all(likeValue, pageNumber)
+        } else {
+          pageRows = s.pageAll.all(likeValue)
+        }
       }
-
-      bookSql += ' ORDER BY name COLLATE NOCASE ASC'
-      pageSql += ' ORDER BY books.name COLLATE NOCASE ASC, pages.page_number ASC'
-
-      const bookRows = db.prepare(bookSql).all(...bookParams)
-      const pageRows = db.prepare(pageSql).all(...pageParams)
 
       const results = [...buildBookResults(bookRows), ...buildPageResults(pageRows)]
       return { success: true, data: results }

@@ -4,12 +4,18 @@ import { shell } from 'electron'
 import PDFDocument from 'pdfkit'
 import sharp from 'sharp'
 
+// ─── Yardımcı: Ayarlardan depolama yolunu al ────────────────────────────────
+
 const getStoragePath = (db) =>
   db.prepare('SELECT value FROM settings WHERE key = ?').get('storage_path')
-    ?.value || null
+    ?.value ?? null
+
+// ─── Yardımcı: Mutlak / göreli yol çözümle ──────────────────────────────────
 
 const resolveStoragePath = (storagePath, targetPath) =>
   path.isAbsolute(targetPath) ? targetPath : path.join(storagePath, targetPath)
+
+// ─── Yardımcı: PDF klasörünü garantiye al ───────────────────────────────────
 
 const ensurePdfFolder = (storagePath) => {
   const pdfDir = path.join(storagePath, 'pdfs')
@@ -17,57 +23,98 @@ const ensurePdfFolder = (storagePath) => {
   return pdfDir
 }
 
-const sanitizeFileName = (value) =>
-  String(value || 'cilt-dijital-kayit-sistemi')
-    .replace(/[<>:"/\\|?*]/g, '')
-    .trim()
+// ─── Yardımcı: Dosya adını güvenli hale getir ───────────────────────────────
 
+const DEFAULT_FILE_NAME = 'cilt-dijital-kayit-sistemi'
+
+const sanitizeFileName = (value) =>
+  String(value || DEFAULT_FILE_NAME)
+    .replace(/[<>:"/\\|?*]/g, '')
+    .trim() || DEFAULT_FILE_NAME
+
+// ─── Yardımcı: Sistem fontunu bul (memoize edilmiş) ─────────────────────────
+
+const FONT_CANDIDATES = {
+  win32: [
+    'C:\\Windows\\Fonts\\segoeui.ttf',
+    'C:\\Windows\\Fonts\\arial.ttf',
+    'C:\\Windows\\Fonts\\calibri.ttf',
+  ],
+  darwin: [
+    '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+    '/System/Library/Fonts/Supplemental/Arial.ttf',
+  ],
+  linux: [
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+  ],
+}
+
+let _cachedFontPath = undefined // undefined = henüz kontrol edilmedi, null = bulunamadı
 
 const resolvePdfFontPath = () => {
-  const candidatesByPlatform = {
-    win32: [
-      'C:\\Windows\\Fonts\\segoeui.ttf',
-      'C:\\Windows\\Fonts\\arial.ttf',
-      'C:\\Windows\\Fonts\\calibri.ttf',
-    ],
-    darwin: [
-      '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
-      '/System/Library/Fonts/Supplemental/Arial.ttf',
-    ],
-    linux: [
-      '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-      '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-    ],
-  }
-
-  const candidates = candidatesByPlatform[process.platform] || []
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null
+  if (_cachedFontPath !== undefined) return _cachedFontPath
+  const candidates = FONT_CANDIDATES[process.platform] ?? []
+  _cachedFontPath = candidates.find((c) => fs.existsSync(c)) ?? null
+  return _cachedFontPath
 }
+
+// ─── Yardımcı: Çakışmayan benzersiz dosya yolu oluştur ──────────────────────
 
 const buildUniqueFilePath = (directoryPath, fileName) => {
-  const safeBaseName =
-    sanitizeFileName(path.parse(fileName).name) || 'cilt-dijital-kayit-sistemi'
+  const baseName = sanitizeFileName(path.parse(fileName).name)
+  const existing = new Set(fs.readdirSync(directoryPath))
 
+  let candidateName = `${baseName}.pdf`
   let attempt = 0
-  let candidateName = `${safeBaseName}.pdf`
-  let candidatePath = path.join(directoryPath, candidateName)
 
-  while (fs.existsSync(candidatePath)) {
+  while (existing.has(candidateName)) {
     attempt += 1
-    candidateName = `${safeBaseName} (${attempt}).pdf`
-    candidatePath = path.join(directoryPath, candidateName)
+    candidateName = `${baseName} (${attempt}).pdf`
   }
 
-  return candidatePath
+  return path.join(directoryPath, candidateName)
 }
+
+// ─── Yardımcı: WriteStream'in bitmesini bekle ───────────────────────────────
 
 const waitForWriteStream = (stream) =>
   new Promise((resolve, reject) => {
-    stream.on('finish', resolve)
-    stream.on('error', reject)
+    stream.once('finish', resolve)
+    stream.once('error', reject)
   })
 
+// ─── Yardımcı: Görselin yatay mı dikey mi olduğunu belirle ─────────────────
+
+const resolveImageOrientation = async (imgSource) => {
+  try {
+    const metadata = await sharp(imgSource).metadata()
+    let w = metadata.width ?? 0
+    let h = metadata.height ?? 0
+
+    // EXIF orientation >= 5 ise genişlik ve yükseklik yer değiştirir
+    if (metadata.orientation >= 5) {
+      ;[w, h] = [h, w]
+    }
+
+    return w > h ? 'landscape' : 'portrait'
+  } catch {
+    return 'portrait' // hata durumunda dikey kabul et
+  }
+}
+
+// ─── Yardımcı: Base64 veri URL'ini Buffer'a çevir ───────────────────────────
+
+const dataUrlToBuffer = (dataUrl) => {
+  const base64 = dataUrl.split(',')[1]
+  return base64 ? Buffer.from(base64, 'base64') : null
+}
+
+// ─── IPC Handler Kayıt Fonksiyonu ───────────────────────────────────────────
+
 export const registerPdfHandlers = ({ ipcMain, db }) => {
+
+  // ── PDF Oluştur ────────────────────────────────────────────────────────────
   ipcMain.handle('pdf:generate', async (_event, payload) => {
     let finalPdfPath = null
 
@@ -88,102 +135,95 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
       }
 
       const pdfDir = ensurePdfFolder(storagePath)
+
       const requestedName = sanitizeFileName(
-        Array.isArray(payload)
-          ? 'cilt-dijital-kayit-sistemi'
-          : payload?.fileName || 'cilt-dijital-kayit-sistemi'
+        Array.isArray(payload) ? DEFAULT_FILE_NAME : (payload?.fileName ?? DEFAULT_FILE_NAME)
       )
 
       finalPdfPath = buildUniqueFilePath(pdfDir, requestedName)
       const finalFileName = path.basename(finalPdfPath)
 
+      // PDFKit dokümanını hazırla
       const doc = new PDFDocument({ autoFirstPage: false, margin: 20 })
+
       const pdfFontPath = resolvePdfFontPath()
       if (pdfFontPath) {
         doc.registerFont('ui', pdfFontPath)
         doc.font('ui')
       }
-      const writeStream = fs.createWriteStream(finalPdfPath)
+
+      const writeStream = fs.createWriteStream(finalPdfPath, { encoding: null })
       doc.pipe(writeStream)
 
+      const MARGIN = 20
+
       for (let i = 0; i < selections.length; i++) {
+        // Her 50 sayfada bir olay döngüsüne nefes aldır (GC & UI yanıt verme)
         if (i > 0 && i % 50 === 0) {
-          // Her 50 sayfada bir Garbage Collection'a ve ana döngüye nefes aldır.
           await new Promise((resolve) => setImmediate(resolve))
         }
 
         const item = selections[i]
-        let imgSource = null
-        if (item.annotatedDataUrl) {
-          const base64Data = item.annotatedDataUrl.split(',')[1]
-          if (base64Data) {
-            imgSource = Buffer.from(base64Data, 'base64')
-          }
-        }
+
+        // Görsel kaynağını belirle: önce annotated base64, sonra disk yolu
+        let imgSource =
+          item.annotatedDataUrl ? dataUrlToBuffer(item.annotatedDataUrl) : null
 
         if (!imgSource) {
           const absPath = resolveStoragePath(storagePath, item.imagePath)
-          if (fs.existsSync(absPath)) {
-            imgSource = absPath
-          }
+          if (fs.existsSync(absPath)) imgSource = absPath
         }
 
-        let isLandscape = false
-        if (imgSource) {
-          try {
-            const metadata = await sharp(imgSource).metadata()
-            let w = metadata.width
-            let h = metadata.height
-            if (metadata.orientation && metadata.orientation >= 5) {
-              w = metadata.height
-              h = metadata.width
-            }
-            if (w > h) isLandscape = true
-          } catch (e) {
-            // Ignore error, fallback to portrait
-          }
-        }
+        // Sayfa yönünü belirle
+        const layout = imgSource
+          ? await resolveImageOrientation(imgSource)
+          : 'portrait'
 
-        const margin = 20
-        doc.addPage({ 
-          size: 'A4', 
-          layout: isLandscape ? 'landscape' : 'portrait',
-          margin: margin 
-        })
+        const isLandscape = layout === 'landscape'
 
+        // A4 boyutları (puan cinsinden)
         const A4_W = isLandscape ? 841.89 : 595.28
         const A4_H = isLandscape ? 595.28 : 841.89
+        const PAGE_W = A4_W - MARGIN * 2
+        const PAGE_H = A4_H - MARGIN * 2
 
-        const PAGE_W = A4_W - (margin * 2)
-        const PAGE_H = A4_H - (margin * 2)
-
-        const NOTE_AREA = item.note?.trim() ? 40 : 0
+        const hasNote = Boolean(item.note?.trim())
+        const NOTE_AREA = hasNote ? 40 : 0
         const IMG_MAX_H = PAGE_H - NOTE_AREA - 20
 
+        doc.addPage({ size: 'A4', layout, margin: MARGIN })
+
+        // Görseli yerleştir
         if (imgSource) {
-          doc.image(imgSource, margin, margin, {
+          doc.image(imgSource, MARGIN, MARGIN, {
             fit: [PAGE_W, IMG_MAX_H],
             align: 'center',
             valign: 'top',
           })
         }
 
-        const labelY = margin + IMG_MAX_H + 5
-        doc.fontSize(11).fillColor('#24324a')
+        // Sayfa etiketi
         const bookLabel = item.bookName?.trim()
           ? `Cilt ${item.bookName}`
           : 'Cilt Adsız'
-        doc.text(
-          `${bookLabel} - Sayfa ${item.pageNumber}`,
-          margin,
-          labelY,
-          { width: PAGE_W, align: 'center' }
-        )
 
-        if (item.note?.trim()) {
-          doc.moveDown(0.3)
-          doc.fontSize(10).fillColor('#4a5c78')
-          doc.text(item.note.trim(), { width: PAGE_W, align: 'center' })
+        const labelY = MARGIN + IMG_MAX_H + 5
+
+        doc
+          .fontSize(11)
+          .fillColor('#24324a')
+          .text(`${bookLabel} - Sayfa ${item.pageNumber}`, MARGIN, labelY, {
+            width: PAGE_W,
+            align: 'center',
+          })
+
+        // Not alanı
+        if (hasNote) {
+          doc
+            .moveDown(0.3)
+            .fontSize(10)
+            .fillColor('#4a5c78')
+            .text(item.note.trim(), { width: PAGE_W, align: 'center' })
         }
       }
 
@@ -192,20 +232,19 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
 
       return {
         success: true,
-        data: {
-          filePath: finalPdfPath,
-          fileName: finalFileName,
-        },
+        data: { filePath: finalPdfPath, fileName: finalFileName },
       }
     } catch (error) {
-      if (finalPdfPath && fs.existsSync(finalPdfPath)) {
-        fs.rmSync(finalPdfPath, { force: true })
+      // Hatalı / yarım kalan dosyayı temizle
+      if (finalPdfPath) {
+        try { fs.rmSync(finalPdfPath, { force: true }) } catch { /* yoksay */ }
       }
 
       return { success: false, error: error.message }
     }
   })
 
+  // ── PDF Listele ────────────────────────────────────────────────────────────
   ipcMain.handle('pdf:list', () => {
     try {
       const storagePath = getStoragePath(db)
@@ -214,23 +253,24 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
       }
 
       const pdfDir = ensurePdfFolder(storagePath)
+
+      // withFileTypes + tek stat çağrısı ile hem dosya kontrolü hem stat bilgisi
       const items = fs
         .readdirSync(pdfDir, { withFileTypes: true })
-        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.pdf'))
-        .map((entry) => {
-          const fullPath = path.join(pdfDir, entry.name)
-          const stat = fs.statSync(fullPath)
-
+        .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.pdf'))
+        .map((e) => {
+          const fullPath = path.join(pdfDir, e.name)
+          const { birthtimeMs, mtimeMs, size } = fs.statSync(fullPath)
           return {
             id: fullPath,
-            name: entry.name,
+            name: e.name,
             filePath: fullPath,
-            createdAt: stat.birthtimeMs,
-            updatedAt: stat.mtimeMs,
-            size: stat.size,
+            createdAt: birthtimeMs,
+            updatedAt: mtimeMs,
+            size,
           }
         })
-        .sort((left, right) => right.updatedAt - left.updatedAt)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
 
       return { success: true, data: items }
     } catch (error) {
@@ -238,6 +278,7 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
     }
   })
 
+  // ── PDF Aç ─────────────────────────────────────────────────────────────────
   ipcMain.handle('pdf:open', async (_event, filePath) => {
     try {
       if (!filePath || !fs.existsSync(filePath)) {
@@ -245,16 +286,13 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
       }
 
       const result = await shell.openPath(filePath)
-      if (result) {
-        return { success: false, error: result }
-      }
-
-      return { success: true }
+      return result ? { success: false, error: result } : { success: true }
     } catch (error) {
       return { success: false, error: error.message }
     }
   })
 
+  // ── Klasörde Göster ────────────────────────────────────────────────────────
   ipcMain.handle('pdf:revealInFolder', (_event, filePath) => {
     try {
       if (!filePath || !fs.existsSync(filePath)) {
@@ -268,6 +306,7 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
     }
   })
 
+  // ── PDF Sil ────────────────────────────────────────────────────────────────
   ipcMain.handle('pdf:delete', (_event, filePath) => {
     try {
       if (!filePath || !fs.existsSync(filePath)) {

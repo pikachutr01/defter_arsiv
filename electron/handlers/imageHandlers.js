@@ -3,21 +3,26 @@ import path from 'path'
 import sharp from 'sharp'
 import { dialog, shell } from 'electron'
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const JPEG_QUALITY = 82
 
-const getStoragePath = (db) =>
-  db.prepare('SELECT value FROM settings WHERE key = ?').get('storage_path')
-    ?.value || null
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-
-const ensureDir = (targetPath) => {
-  fs.mkdirSync(targetPath, { recursive: true })
+let _cachedStoragePath = undefined
+const getStoragePath = (db) => {
+  if (_cachedStoragePath !== undefined) return _cachedStoragePath
+  _cachedStoragePath =
+    db.prepare('SELECT value FROM settings WHERE key = ?').get('storage_path')
+      ?.value ?? null
+  return _cachedStoragePath
 }
+
+const ensureDir = (targetPath) => fs.mkdirSync(targetPath, { recursive: true })
 
 const buildImagePaths = (storagePath, bookId, pageNumber) => {
   const baseFolder = path.join(storagePath, 'books', `book_${bookId}`)
   const fileBase = `page_${pageNumber}`
-
   return {
     baseFolder,
     originalAbs: path.join(baseFolder, `${fileBase}.jpg`),
@@ -28,14 +33,16 @@ const buildImagePaths = (storagePath, bookId, pageNumber) => {
 
 const updatePageImage = (db, pageId, relativePath, uploaded) => {
   db.prepare(
-    `UPDATE pages SET image = ?, is_uploaded = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    'UPDATE pages SET image = ?, is_uploaded = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
   ).run(relativePath, uploaded ? 1 : 0, pageId)
 }
 
 const getPageInfo = (db, pageId) =>
   db
     .prepare(
-      'SELECT pages.id, pages.page_number, pages.book_id, books.name AS book_name FROM pages JOIN books ON pages.book_id = books.id WHERE pages.id = ?'
+      `SELECT pages.id, pages.page_number, pages.book_id, books.name AS book_name
+       FROM pages JOIN books ON pages.book_id = books.id
+       WHERE pages.id = ?`
     )
     .get(pageId)
 
@@ -43,18 +50,16 @@ const resolveStoragePath = (storagePath, targetPath) =>
   path.isAbsolute(targetPath) ? targetPath : path.join(storagePath, targetPath)
 
 const removeIfExists = (targetPath) => {
-  if (targetPath && fs.existsSync(targetPath)) {
-    fs.unlinkSync(targetPath)
-  }
+  if (targetPath && fs.existsSync(targetPath)) fs.unlinkSync(targetPath)
 }
 
 const optimizeAndSaveImage = async (sourcePath, targetPath) => {
-  let pipeline = sharp(sourcePath, { failOn: 'none' }).rotate()
-  const metadata = await pipeline.metadata()
+  const instance = sharp(sourcePath, { failOn: 'none' }).rotate()
+  const metadata = await instance.metadata()
 
-  if (metadata.hasAlpha) {
-    pipeline = pipeline.flatten({ background: '#ffffff' })
-  }
+  const pipeline = metadata.hasAlpha
+    ? instance.flatten({ background: '#ffffff' })
+    : instance
 
   await pipeline
     .jpeg({
@@ -66,7 +71,14 @@ const optimizeAndSaveImage = async (sourcePath, targetPath) => {
     .toFile(targetPath)
 }
 
+// ─── IPC Handlers ────────────────────────────────────────────────────────────
+
 export const registerImageHandlers = ({ ipcMain, db }) => {
+  // Sık kullanılan sorguları bir kez derle
+  const stmtGetPageBasic = db.prepare(
+    'SELECT book_id, page_number FROM pages WHERE id = ?'
+  )
+
   const handleUpload = async (pageId, sourcePath) => {
     try {
       const storagePath = getStoragePath(db)
@@ -79,11 +91,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
         return { success: false, error: 'Sayfa bulunamadı.' }
       }
 
-      const imagePaths = buildImagePaths(
-        storagePath,
-        page.book_id,
-        page.page_number
-      )
+      const imagePaths = buildImagePaths(storagePath, page.book_id, page.page_number)
 
       ensureDir(imagePaths.baseFolder)
       await optimizeAndSaveImage(sourcePath, imagePaths.originalAbs)
@@ -96,7 +104,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
     }
   }
 
-  ipcMain.handle('images:upload', async (_event, pageId, sourcePath) =>
+  ipcMain.handle('images:upload', (_event, pageId, sourcePath) =>
     handleUpload(pageId, sourcePath)
   )
 
@@ -111,8 +119,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
         return { success: false, error: 'Seçim iptal edildi.' }
       }
 
-      const sourcePath = result.filePaths[0]
-      return await handleUpload(pageId, sourcePath)
+      return handleUpload(pageId, result.filePaths[0])
     } catch (error) {
       return { success: false, error: error.message }
     }
@@ -125,19 +132,12 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
         return { success: false, error: 'Depolama yolu tanımlı değil.' }
       }
 
-      const page = db
-        .prepare('SELECT book_id, page_number FROM pages WHERE id = ?')
-        .get(pageId)
+      const page = stmtGetPageBasic.get(pageId)
       if (!page) {
         return { success: false, error: 'Sayfa bulunamadı.' }
       }
 
-      const imagePaths = buildImagePaths(
-        storagePath,
-        page.book_id,
-        page.page_number
-      )
-
+      const imagePaths = buildImagePaths(storagePath, page.book_id, page.page_number)
       removeIfExists(imagePaths.originalAbs)
       removeIfExists(imagePaths.legacyThumbAbs)
 
@@ -148,7 +148,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
     }
   })
 
-  ipcMain.handle('images:export', (_event, imagePaths, destFolder) => {
+  ipcMain.handle('images:export', async (_event, imagePaths, destFolder) => {
     try {
       const storagePath = getStoragePath(db)
       if (!storagePath) {
@@ -157,13 +157,18 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
 
       ensureDir(destFolder)
 
-      imagePaths.forEach((imagePath) => {
-        const sourceAbs = resolveStoragePath(storagePath, imagePath)
-        if (fs.existsSync(sourceAbs)) {
-          const fileName = path.basename(sourceAbs)
-          fs.copyFileSync(sourceAbs, path.join(destFolder, fileName))
-        }
-      })
+      // Kopyalamaları paralel çalıştır
+      await Promise.all(
+        imagePaths.map(async (imagePath) => {
+          const sourceAbs = resolveStoragePath(storagePath, imagePath)
+          if (fs.existsSync(sourceAbs)) {
+            await fs.promises.copyFile(
+              sourceAbs,
+              path.join(destFolder, path.basename(sourceAbs))
+            )
+          }
+        })
+      )
 
       return { success: true }
     } catch (error) {
@@ -190,7 +195,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
     }
   })
 
-  ipcMain.handle('images:getThumbnail', async (_event, imagePath) => {
+  ipcMain.handle('images:getThumbnail', (_event, imagePath) => {
     try {
       const storagePath = getStoragePath(db)
       if (!storagePath) {

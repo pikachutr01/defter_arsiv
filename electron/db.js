@@ -87,17 +87,23 @@ export const getDb = () => {
   return dbInstance
 }
 
+let stmtGetSetting = null
 export const getSetting = (key) => {
-  const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key)
+  if (!stmtGetSetting) {
+    stmtGetSetting = getDb().prepare('SELECT value FROM settings WHERE key = ?')
+  }
+  const row = stmtGetSetting.get(key)
   return row ? row.value : null
 }
 
+let stmtSetSetting = null
 export const setSetting = (key, value) => {
-  getDb()
-    .prepare(
+  if (!stmtSetSetting) {
+    stmtSetSetting = getDb().prepare(
       'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
     )
-    .run(key, value)
+  }
+  stmtSetSetting.run(key, value)
 }
 
 export const ensureDefaults = ({ userDataRoot, documentsRoot }) => {
