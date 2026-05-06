@@ -80,12 +80,23 @@ export default function Help() {
 
       <div className="mt-12 text-center text-xs text-[var(--text-muted)]">
         <p>Sistemle ilgili teknik destek almak için iletişime geçebilirsiniz:</p>
-        <a 
-          href="mailto:abdullahkaya544@gmail.com?subject=Cilt Dijital Kayıt Sistemi" 
-          className="mt-1 inline-block text-[var(--accent)] transition hover:text-[var(--accent-hover)] hover:underline"
-        >
-          abdullahkaya544@gmail.com
-        </a>
+        <div className="mt-1 flex items-center justify-center gap-2">
+          <a
+            href="mailto:abdullahkaya544@gmail.com?subject=Cilt Dijital Kayıt Sistemi"
+            className="text-[var(--accent)] transition hover:text-[var(--accent-hover)] hover:underline"
+          >
+            abdullahkaya544@gmail.com
+          </a>
+          <span>|</span>
+          <a
+            href="https://github.com/pikachutr01/defter_arsiv"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[var(--accent)] transition hover:text-[var(--accent-hover)] hover:underline"
+          >
+            Github
+          </a>
+        </div>
       </div>
     </section>
   )

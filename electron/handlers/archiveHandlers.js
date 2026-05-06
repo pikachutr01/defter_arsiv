@@ -4,6 +4,7 @@ import { app, dialog } from 'electron'
 import archiver from 'archiver'
 import unzipper from 'unzipper'
 import { pipeline } from 'stream/promises'
+import { closeDb } from '../db.js'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,11 @@ const ensureDir = (targetPath) => fs.mkdirSync(targetPath, { recursive: true })
 
 const getAppDataPath = () =>
   path.join(app.getPath('userData'), 'cilt-dijital-kayit-sistemi')
+
+const getDbCompanionPaths = (dbPath) => ({
+  wal: `${dbPath}-wal`,
+  shm: `${dbPath}-shm`,
+})
 
 /**
  * Cache'li storage path getter.
@@ -56,7 +62,20 @@ const copyRecursiveAsync = async (src, dest) => {
 
 const removeIfExists = (targetPath) => {
   if (fs.existsSync(targetPath)) {
-    fs.rmSync(targetPath, { recursive: true, force: true })
+    fs.rmSync(targetPath, {
+      recursive: true,
+      force: true,
+      maxRetries: 6,
+      retryDelay: 150,
+    })
+  }
+}
+
+const cleanupIfExists = (targetPath) => {
+  try {
+    removeIfExists(targetPath)
+  } catch (error) {
+    console.warn('Cleanup skipped:', targetPath, error.message)
   }
 }
 
@@ -108,6 +127,12 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
       const dataPath = getAppDataPath()
       const dbPath = path.join(dataPath, 'database.sqlite')
 
+      try {
+        db.pragma('wal_checkpoint(TRUNCATE)')
+      } catch {
+        // Checkpoint basarisiz olsa da export akisi devam etsin.
+      }
+
       // Üç sorguyu paralel çalıştır
       const [{ count: bookCount }, { count: pageCount }, { count: imageCount }] =
         await Promise.all([
@@ -154,6 +179,7 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
   ipcMain.handle('archive:importFull', async () => {
     const dataPath = getAppDataPath()
     const currentDbPath = path.join(dataPath, 'database.sqlite')
+    const currentDbCompanions = getDbCompanionPaths(currentDbPath)
     const backupPath = path.join(dataPath, `backup-${Date.now()}`)
     let tempDir = null
 
@@ -161,6 +187,7 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
     let backupReady = false
     let replacedDb = false
     let replacedImages = false
+    let dbClosed = false
     let storagePath = null
 
     try {
@@ -216,6 +243,10 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
       }
 
       // ── 3. Uygula ────────────────────────────────────────────────────────
+      closeDb()
+      dbClosed = true
+      removeIfExists(currentDbCompanions.wal)
+      removeIfExists(currentDbCompanions.shm)
       await copyRecursiveAsync(importedDb, currentDbPath)
       replacedDb = true
 
@@ -226,8 +257,8 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
       }
 
       // ── 4. Temizle & yeniden başlat ──────────────────────────────────────
-      removeIfExists(tempDir)
-      removeIfExists(backupPath)
+      cleanupIfExists(tempDir)
+      cleanupIfExists(backupPath)
 
       // relaunch'ı güvenli biçimde tetikle; microtask queue bitmesini bekle
       setImmediate(() => {
@@ -244,6 +275,8 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
 
         try {
           if (replacedDb && fs.existsSync(backupDbPath)) {
+            removeIfExists(currentDbCompanions.wal)
+            removeIfExists(currentDbCompanions.shm)
             await copyRecursiveAsync(backupDbPath, currentDbPath)
           }
           if (replacedImages && fs.existsSync(backupImagesPath) && storagePath) {
@@ -260,7 +293,14 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
       }
 
       // Hata durumunda tempDir'i temizlemeyi unutma
-      if (tempDir) removeIfExists(tempDir)
+      if (tempDir) cleanupIfExists(tempDir)
+
+      if (dbClosed) {
+        setImmediate(() => {
+          app.relaunch()
+          app.exit(0)
+        })
+      }
 
       return { success: false, error: error.message }
     }

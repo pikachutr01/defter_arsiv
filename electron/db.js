@@ -87,6 +87,15 @@ export const getDb = () => {
   return dbInstance
 }
 
+export const closeDb = () => {
+  if (dbInstance) {
+    dbInstance.close()
+    dbInstance = null
+  }
+  stmtGetSetting = null
+  stmtSetSetting = null
+}
+
 let stmtGetSetting = null
 export const getSetting = (key) => {
   if (!stmtGetSetting) {

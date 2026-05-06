@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { RECOVERY_PUBLIC_KEY } from '../recoveryKeys.js'
+import { grantDeveloperResetAccess } from '../developerReset.js'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -27,7 +28,7 @@ const setSetting = (db, key, value) => {
 
 const decodeBase64Url = (value) => Buffer.from(value, 'base64url')
 
-const verifyRecoveryToken = (token, deviceId) => {
+const verifySignedToken = (token, deviceId, expectedPurpose) => {
   if (!RECOVERY_PUBLIC_KEY || RECOVERY_PUBLIC_KEY === 'REPLACE_WITH_PUBLIC_KEY_PEM') {
     return { valid: false, error: 'Kurtarma anahtarı tanımlı değil.' }
   }
@@ -50,7 +51,7 @@ const verifyRecoveryToken = (token, deviceId) => {
     return { valid: false, error: 'Token eksik bilgi içeriyor.' }
   }
 
-  if (payload.purpose !== 'password_reset') {
+  if (payload.purpose !== expectedPurpose) {
     return { valid: false, error: 'Token amacı geçersiz.' }
   }
 
@@ -74,16 +75,12 @@ const verifyRecoveryToken = (token, deviceId) => {
     return { valid: false, error: 'Token doğrulanamadı.' }
   }
 
-  return { valid: true }
+  return { valid: true, payload }
 }
 
 // ─── IPC Handlers ───────────────────────────────────────────────────────────
 
 export const registerAuthHandlers = ({ ipcMain, db }) => {
-
-  // Prepared statement'ları bir kez oluştur, her çağrıda yeniden parse etme
-  const stmtGetSetting = db.prepare('SELECT value FROM settings WHERE key = ?')
-  const _origGetSetting = (key) => stmtGetSetting.get(key)?.value ?? null
 
   ipcMain.handle('auth:login', async (_event, { username, password }) => {
     try {
@@ -95,10 +92,11 @@ export const registerAuthHandlers = ({ ipcMain, db }) => {
       }
 
       // Kullanıcı adını sabit zamanlı karşılaştır (timing attack'a karşı)
-      const usernameMatch = crypto.timingSafeEqual(
-        Buffer.from(username),
-        Buffer.from(storedUsername)
-      )
+      const usernameBuffer = Buffer.from(String(username ?? ''))
+      const storedUsernameBuffer = Buffer.from(String(storedUsername ?? ''))
+      const usernameMatch =
+        usernameBuffer.length === storedUsernameBuffer.length &&
+        crypto.timingSafeEqual(usernameBuffer, storedUsernameBuffer)
       const passwordMatch = await bcrypt.compare(password, storedHash)
 
       if (!usernameMatch || !passwordMatch) {
@@ -148,7 +146,7 @@ export const registerAuthHandlers = ({ ipcMain, db }) => {
         return { success: false, error: 'Cihaz kimliği bulunamadı.' }
       }
 
-      const validation = verifyRecoveryToken(token, installId)
+      const validation = verifySignedToken(token, installId, 'password_reset')
       if (!validation.valid) {
         return { success: false, error: validation.error }
       }
@@ -158,6 +156,30 @@ export const registerAuthHandlers = ({ ipcMain, db }) => {
 
       const currentUsername = getSetting(db, 'auth_username') || 'admin'
       return { success: true, username: currentUsername }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('auth:authorizeDeveloperReset', async (_event, { token }) => {
+    try {
+      const installId = getSetting(db, 'install_id')
+      if (!installId) {
+        return { success: false, error: 'Cihaz kimliÄŸi bulunamadÄ±.' }
+      }
+
+      const validation = verifySignedToken(token, installId, 'developer_reset')
+      if (!validation.valid) {
+        return { success: false, error: validation.error }
+      }
+
+      grantDeveloperResetAccess(validation.payload.exp)
+      return {
+        success: true,
+        data: {
+          expiresAt: validation.payload.exp,
+        },
+      }
     } catch (error) {
       return { success: false, error: error.message }
     }

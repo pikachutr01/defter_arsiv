@@ -16,6 +16,7 @@ import { registerPdfHandlers } from './handlers/pdfHandlers.js'
 import { registerSearchHandlers } from './handlers/searchHandlers.js'
 import { registerSettingsHandlers } from './handlers/settingsHandlers.js'
 import { registerArchiveHandlers } from './handlers/archiveHandlers.js'
+import { runPendingDeveloperReset } from './developerReset.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -68,6 +69,8 @@ const createMainWindow = () => {
 }
 
 const setupApp = () => {
+  runPendingDeveloperReset(app.getPath('userData'))
+
   const userDataRoot = path.join(
     app.getPath('userData'),
     'cilt-dijital-kayit-sistemi'

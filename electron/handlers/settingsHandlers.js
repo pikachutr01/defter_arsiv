@@ -3,6 +3,12 @@ import path from 'path'
 import { dialog } from 'electron'
 import crypto from 'crypto'
 import { ensureStorageFolders, getDefaultStoragePath } from '../db.js'
+import {
+  clearDeveloperResetAccess,
+  getInternalDataPath,
+  hasDeveloperResetAccess,
+  writeDeveloperResetRequest,
+} from '../developerReset.js'
 
 // ─── DB Yardımcıları ─────────────────────────────────────────────────────────
 
@@ -149,6 +155,61 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
   })
 
   // ── Klasör Seç (Dialog) ────────────────────────────────────────────────────
+  ipcMain.handle('settings:getDeveloperResetContext', () => {
+    try {
+      const userDataPath = app.getPath('userData')
+      const currentStoragePath = getSetting(db, 'storage_path') ?? buildFallbackStoragePath(app)
+      return {
+        success: true,
+        data: {
+          deviceId: getSetting(db, 'install_id') ?? '',
+          userDataPath,
+          internalDataPath: getInternalDataPath(userDataPath),
+          storagePath: currentStoragePath,
+        },
+      }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('settings:scheduleDeveloperReset', (_event, payload) => {
+    try {
+      if (!hasDeveloperResetAccess()) {
+        return {
+          success: false,
+          error: 'Geliştirici sıfırlaması için geçerli bir token doğrulaması gerekiyor.',
+        }
+      }
+
+      const resetDatabase = Boolean(payload?.resetDatabase)
+      const clearStorage = Boolean(payload?.clearStorage)
+
+      if (!resetDatabase && !clearStorage) {
+        return { success: false, error: 'En az bir sıfırlama seçeneği seçilmelidir.' }
+      }
+
+      const storagePath = getSetting(db, 'storage_path') ?? buildFallbackStoragePath(app)
+      writeDeveloperResetRequest(app.getPath('userData'), {
+        resetDatabase,
+        clearStorage,
+        storagePath,
+        requestedAt: Date.now(),
+      })
+      clearDeveloperResetAccess()
+
+      setImmediate(() => {
+        app.relaunch()
+        app.exit(0)
+      })
+
+      return { success: true, data: { restarting: true } }
+    } catch (error) {
+      clearDeveloperResetAccess()
+      return { success: false, error: error.message }
+    }
+  })
+
   ipcMain.handle('settings:chooseStoragePath', async () => {
     try {
       const currentPath = getSetting(db, 'storage_path') ?? buildFallbackStoragePath(app)

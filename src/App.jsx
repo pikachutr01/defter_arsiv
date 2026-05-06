@@ -4,6 +4,7 @@ import { ipc } from './utils/ipc.js'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import Sidebar from './components/layout/Sidebar.jsx'
 import TopBar from './components/layout/TopBar.jsx'
+import DeveloperResetGateway from './components/layout/DeveloperResetGateway.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Login from './pages/Login.jsx'
 import BookDetail from './pages/BookDetail.jsx'
@@ -44,6 +45,7 @@ function AppLayout() {
         <Sidebar />
         <div className="flex-1">
           <TopBar />
+          <DeveloperResetGateway />
           <main className="px-8 pb-12 pt-6">
             <Outlet />
           </main>

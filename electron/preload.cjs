@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     changeCredentials: (payload) =>
       ipcRenderer.invoke('auth:changeCredentials', payload),
     resetWithToken: (payload) => ipcRenderer.invoke('auth:resetWithToken', payload),
+    authorizeDeveloperReset: (payload) =>
+      ipcRenderer.invoke('auth:authorizeDeveloperReset', payload),
   },
   books: {
     getAll: () => ipcRenderer.invoke('books:getAll'),
@@ -60,6 +62,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('settings:setStoragePath', value),
     chooseStoragePath: () => ipcRenderer.invoke('settings:chooseStoragePath'),
     verifyStoragePath: () => ipcRenderer.invoke('settings:verifyStoragePath'),
+    getDeveloperResetContext: () =>
+      ipcRenderer.invoke('settings:getDeveloperResetContext'),
+    scheduleDeveloperReset: (payload) =>
+      ipcRenderer.invoke('settings:scheduleDeveloperReset', payload),
     scanStorageIntegrity: (payload) =>
       ipcRenderer.invoke('settings:scanStorageIntegrity', payload),
     deleteOrphanFiles: (payload) =>

@@ -9,6 +9,8 @@ export const ipc = {
   authLogin: (credentials) => getApi().auth.login(credentials),
   authChange: (payload) => getApi().auth.changeCredentials(payload),
   authResetWithToken: (payload) => getApi().auth.resetWithToken(payload),
+  authAuthorizeDeveloperReset: (payload) =>
+    getApi().auth.authorizeDeveloperReset(payload),
   booksGetAll: () => getApi().books.getAll(),
   booksGetById: (id) => getApi().books.getById(id),
   booksChooseCover: () => getApi().books.chooseCover(),
@@ -42,6 +44,10 @@ export const ipc = {
   settingsSet: (key, value) => getApi().settings.set(key, value),
   settingsGetStoragePath: () => getApi().settings.getStoragePath(),
   settingsVerifyStoragePath: () => getApi().settings.verifyStoragePath(),
+  settingsGetDeveloperResetContext: () =>
+    getApi().settings.getDeveloperResetContext(),
+  settingsScheduleDeveloperReset: (payload) =>
+    getApi().settings.scheduleDeveloperReset(payload),
   settingsSetStoragePath: (value) => getApi().settings.setStoragePath(value),
   settingsChooseStoragePath: () => getApi().settings.chooseStoragePath(),
   settingsScanStorageIntegrity: (payload) =>

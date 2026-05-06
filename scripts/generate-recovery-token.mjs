@@ -11,9 +11,12 @@ const getArg = (name) => {
 const deviceId = getArg('--device')
 const privateKeyPath = getArg('--privateKey')
 const ttlHours = Number(getArg('--ttlHours') || 24)
+const purpose = getArg('--purpose') || 'password_reset'
 
 if (!deviceId || !privateKeyPath) {
-  console.error('Usage: node scripts/generate-recovery-token.mjs --device <id> --privateKey <path> [--ttlHours 24]')
+  console.error(
+    'Usage: node scripts/generate-recovery-token.mjs --device <id> --privateKey <path> [--ttlHours 24] [--purpose password_reset]'
+  )
   process.exit(1)
 }
 
@@ -26,7 +29,7 @@ const privateKeyPem = fs.readFileSync(privateKeyPath, 'utf8')
 const now = Date.now()
 const exp = now + ttlHours * 60 * 60 * 1000
 const payload = {
-  purpose: 'password_reset',
+  purpose,
   deviceId,
   iat: now,
   exp,
