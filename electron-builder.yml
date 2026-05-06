@@ -1,5 +1,7 @@
 appId: com.personal.cilt-dijital-kayit-sistemi
 productName: Cilt Dijital Kayıt Sistemi
+directories:
+  output: release
 win:
   target:
     - nsis
