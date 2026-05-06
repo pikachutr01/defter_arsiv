@@ -26,41 +26,35 @@ CREATE TABLE IF NOT EXISTS pages (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id         INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
     page_number     INTEGER NOT NULL,
-  page_notes      TEXT,
-    side_a_image    TEXT,
-    side_a_notes    TEXT,
-    side_a_uploaded INTEGER DEFAULT 0,
-    side_b_image    TEXT,
-    side_b_notes    TEXT,
-    side_b_uploaded INTEGER DEFAULT 0,
+    page_notes      TEXT,
+    image           TEXT,
+    is_uploaded     INTEGER DEFAULT 0,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(book_id, page_number)
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
-    side_a_notes,
-    side_b_notes,
-  page_notes,
+    page_notes,
     content='pages',
     content_rowid='id'
 );
 
 CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
-  INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes)
-  VALUES (new.id, new.side_a_notes, new.side_b_notes, new.page_notes);
+  INSERT INTO pages_fts(rowid, page_notes)
+  VALUES (new.id, new.page_notes);
 END;
 
 CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-  INSERT INTO pages_fts(pages_fts, rowid, side_a_notes, side_b_notes, page_notes)
-  VALUES ('delete', old.id, old.side_a_notes, old.side_b_notes, old.page_notes);
-  INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes)
-  VALUES (new.id, new.side_a_notes, new.side_b_notes, new.page_notes);
+  INSERT INTO pages_fts(pages_fts, rowid, page_notes)
+  VALUES ('delete', old.id, old.page_notes);
+  INSERT INTO pages_fts(rowid, page_notes)
+  VALUES (new.id, new.page_notes);
 END;
 
 CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-  INSERT INTO pages_fts(pages_fts, rowid, side_a_notes, side_b_notes, page_notes)
-  VALUES ('delete', old.id, old.side_a_notes, old.side_b_notes, old.page_notes);
+  INSERT INTO pages_fts(pages_fts, rowid, page_notes)
+  VALUES ('delete', old.id, old.page_notes);
 END;
 
 CREATE INDEX IF NOT EXISTS idx_pages_book_id ON pages(book_id);
@@ -159,38 +153,53 @@ const rebuildFts = (db) => {
     DROP TABLE IF EXISTS pages_fts;
 
     CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
-      side_a_notes,
-      side_b_notes,
       page_notes,
       content='pages',
       content_rowid='id'
     );
 
     CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
-        INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes)
-        VALUES (new.id, new.side_a_notes, new.side_b_notes, new.page_notes);
+        INSERT INTO pages_fts(rowid, page_notes)
+        VALUES (new.id, new.page_notes);
     END;
 
     CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-        INSERT INTO pages_fts(pages_fts, rowid, side_a_notes, side_b_notes, page_notes)
-        VALUES ('delete', old.id, old.side_a_notes, old.side_b_notes, old.page_notes);
-        INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes)
-        VALUES (new.id, new.side_a_notes, new.side_b_notes, new.page_notes);
+        INSERT INTO pages_fts(pages_fts, rowid, page_notes)
+        VALUES ('delete', old.id, old.page_notes);
+        INSERT INTO pages_fts(rowid, page_notes)
+        VALUES (new.id, new.page_notes);
     END;
 
     CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-        INSERT INTO pages_fts(pages_fts, rowid, side_a_notes, side_b_notes, page_notes)
-        VALUES ('delete', old.id, old.side_a_notes, old.side_b_notes, old.page_notes);
+        INSERT INTO pages_fts(pages_fts, rowid, page_notes)
+        VALUES ('delete', old.id, old.page_notes);
     END;
   `)
 
   db.prepare(
-    'INSERT INTO pages_fts(rowid, side_a_notes, side_b_notes, page_notes) SELECT id, side_a_notes, side_b_notes, page_notes FROM pages'
+    'INSERT INTO pages_fts(rowid, page_notes) SELECT id, page_notes FROM pages'
   ).run()
 }
 
 const ensureSchemaUpdates = (db) => {
   ensureColumn(db, 'books', 'book_notes', 'TEXT')
+
+  const pagesColumns = db
+    .prepare('PRAGMA table_info(pages)')
+    .all()
+    .map((column) => column.name)
+
+  if (pagesColumns.includes('side_a_image')) {
+    db.exec(`
+      DROP TRIGGER IF EXISTS pages_ai;
+      DROP TRIGGER IF EXISTS pages_au;
+      DROP TRIGGER IF EXISTS pages_ad;
+      DROP TABLE IF EXISTS pages_fts;
+      DROP TABLE IF EXISTS pages;
+    `)
+    db.exec(schemaSql)
+  }
+
   ensureColumn(db, 'pages', 'page_notes', 'TEXT')
 
   let ftsColumns
@@ -203,7 +212,7 @@ const ensureSchemaUpdates = (db) => {
     ftsColumns = []
   }
 
-  if (!ftsColumns.includes('page_notes')) {
+  if (ftsColumns.includes('side_a_notes')) {
     rebuildFts(db)
   }
 }

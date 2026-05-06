@@ -8,7 +8,7 @@ const buildInitialState = (book) => ({
   name: book?.name || '',
   description: book?.description || '',
   book_notes: book?.book_notes || '',
-  total_pages: book?.total_pages || 0,
+  total_pages: book?.total_pages || '',
 })
 
 export default function BookForm({ book = null, onClose, onSubmit }) {
@@ -50,6 +50,7 @@ export default function BookForm({ book = null, onClose, onSubmit }) {
       event.preventDefault()
       onSubmit({
         ...formState,
+        total_pages: Number(formState.total_pages) || 0,
         cover_source_path: coverSourcePath,
         remove_cover: removeCover,
       })
@@ -100,7 +101,8 @@ export default function BookForm({ book = null, onClose, onSubmit }) {
             <input
               name="total_pages"
               type="number"
-              min="0"
+              min="2"
+              required
               value={formState.total_pages}
               onChange={handleChange}
               className="mt-2 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)]"

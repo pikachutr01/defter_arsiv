@@ -5,7 +5,7 @@ const usePdfQueueStore = create((set) => ({
   addOrUpdateItem: (item) =>
     set((state) => {
       const existingIndex = state.items.findIndex(
-        (entry) => entry.pageId === item.pageId && entry.side === item.side
+        (entry) => entry.pageId === item.pageId
       )
 
       if (existingIndex === -1) {
@@ -34,22 +34,22 @@ const usePdfQueueStore = create((set) => ({
         ),
       }
     }),
-  removeItem: (pageId, side) =>
+  removeItem: (pageId) =>
     set((state) => ({
       items: state.items.filter(
-        (entry) => !(entry.pageId === pageId && entry.side === side)
+        (entry) => entry.pageId !== pageId
       ),
     })),
   toggleItem: (item) =>
     set((state) => {
       const exists = state.items.some(
-        (entry) => entry.pageId === item.pageId && entry.side === item.side
+        (entry) => entry.pageId === item.pageId
       )
 
       if (exists) {
         return {
           items: state.items.filter(
-            (entry) => !(entry.pageId === item.pageId && entry.side === item.side)
+            (entry) => entry.pageId !== item.pageId
           ),
         }
       }
@@ -65,16 +65,16 @@ const usePdfQueueStore = create((set) => ({
         ],
       }
     }),
-  updateItemNote: (pageId, side, note) =>
+  updateItemNote: (pageId, note) =>
     set((state) => ({
       items: state.items.map((entry) =>
-        entry.pageId === pageId && entry.side === side ? { ...entry, note } : entry
+        entry.pageId === pageId ? { ...entry, note } : entry
       ),
     })),
-  updateItemAnnotation: (pageId, side, annotatedDataUrl) =>
+  updateItemAnnotation: (pageId, annotatedDataUrl) =>
     set((state) => ({
       items: state.items.map((entry) =>
-        entry.pageId === pageId && entry.side === side
+        entry.pageId === pageId
           ? { ...entry, annotatedDataUrl }
           : entry
       ),

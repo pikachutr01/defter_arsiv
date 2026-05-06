@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { shell } from 'electron'
 import PDFDocument from 'pdfkit'
+import sharp from 'sharp'
 
 const getStoragePath = (db) =>
   db.prepare('SELECT value FROM settings WHERE key = ?').get('storage_path')
@@ -21,8 +22,6 @@ const sanitizeFileName = (value) =>
     .replace(/[<>:"/\\|?*]/g, '')
     .trim()
 
-const formatSideLabel = (side) =>
-  side === 'A' ? 'Sol Taraf' : side === 'B' ? 'Sağ Taraf' : side
 
 const resolvePdfFontPath = () => {
   const candidatesByPlatform = {
@@ -98,7 +97,7 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
       finalPdfPath = buildUniqueFilePath(pdfDir, requestedName)
       const finalFileName = path.basename(finalPdfPath)
 
-      const doc = new PDFDocument({ autoFirstPage: false, margin: 40 })
+      const doc = new PDFDocument({ autoFirstPage: false, margin: 20 })
       const pdfFontPath = resolvePdfFontPath()
       if (pdfFontPath) {
         doc.registerFont('ui', pdfFontPath)
@@ -114,18 +113,8 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
         }
 
         const item = selections[i]
-        doc.addPage({ size: 'A4', margin: 40 })
-
-        const PAGE_W = 520   // A4 - 2*40 margin
-        const PAGE_H = 750   // usable height
-
-        // Resim için maks yükseklik — alt not alanı için yer bırak
-        const NOTE_AREA = item.note?.trim() ? 60 : 0
-        const IMG_MAX_H = PAGE_H - NOTE_AREA - 30
-
         let imgSource = null
         if (item.annotatedDataUrl) {
-          // base64 data URL → buffer
           const base64Data = item.annotatedDataUrl.split(',')[1]
           if (base64Data) {
             imgSource = Buffer.from(base64Data, 'base64')
@@ -139,30 +128,60 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
           }
         }
 
+        let isLandscape = false
         if (imgSource) {
-          doc.image(imgSource, 40, 40, {
+          try {
+            const metadata = await sharp(imgSource).metadata()
+            let w = metadata.width
+            let h = metadata.height
+            if (metadata.orientation && metadata.orientation >= 5) {
+              w = metadata.height
+              h = metadata.width
+            }
+            if (w > h) isLandscape = true
+          } catch (e) {
+            // Ignore error, fallback to portrait
+          }
+        }
+
+        const margin = 20
+        doc.addPage({ 
+          size: 'A4', 
+          layout: isLandscape ? 'landscape' : 'portrait',
+          margin: margin 
+        })
+
+        const A4_W = isLandscape ? 841.89 : 595.28
+        const A4_H = isLandscape ? 595.28 : 841.89
+
+        const PAGE_W = A4_W - (margin * 2)
+        const PAGE_H = A4_H - (margin * 2)
+
+        const NOTE_AREA = item.note?.trim() ? 40 : 0
+        const IMG_MAX_H = PAGE_H - NOTE_AREA - 20
+
+        if (imgSource) {
+          doc.image(imgSource, margin, margin, {
             fit: [PAGE_W, IMG_MAX_H],
             align: 'center',
             valign: 'top',
           })
         }
 
-        // Başlık — resmin altında sabit konumda
-        const labelY = 40 + IMG_MAX_H + 8
+        const labelY = margin + IMG_MAX_H + 5
         doc.fontSize(11).fillColor('#24324a')
         const bookLabel = item.bookName?.trim()
           ? `Cilt ${item.bookName}`
           : 'Cilt Adsız'
-        const sideLabel = formatSideLabel(item.side)
         doc.text(
-          `${bookLabel} - Sayfa ${item.pageNumber} - ${sideLabel}`,
-          40,
+          `${bookLabel} - Sayfa ${item.pageNumber}`,
+          margin,
           labelY,
           { width: PAGE_W, align: 'center' }
         )
 
         if (item.note?.trim()) {
-          doc.moveDown(0.5)
+          doc.moveDown(0.3)
           doc.fontSize(10).fillColor('#4a5c78')
           doc.text(item.note.trim(), { width: PAGE_W, align: 'center' })
         }

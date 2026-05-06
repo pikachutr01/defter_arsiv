@@ -85,7 +85,7 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
       const rows = db
         .prepare(
           `SELECT b.*,
-            COALESCE(SUM(p.side_a_uploaded + p.side_b_uploaded), 0) AS image_count
+            COALESCE(SUM(p.is_uploaded), 0) AS image_count
            FROM books b
            LEFT JOIN pages p ON p.book_id = b.id
            GROUP BY b.id
@@ -128,6 +128,11 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
 
   ipcMain.handle('books:create', async (_event, data) => {
     try {
+      const existing = db.prepare('SELECT id FROM books WHERE name = ? COLLATE NOCASE').get(data.name)
+      if (existing) {
+        return { success: false, error: 'Bu isimde bir cilt zaten var. Lütfen farklı bir isim girin.' }
+      }
+
       const stmt = db.prepare(
         'INSERT INTO books (name, description, book_notes, total_pages, cover_image, storage_folder) VALUES (?, ?, ?, ?, ?, ?)'
       )
@@ -154,6 +159,11 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
 
   ipcMain.handle('books:update', async (_event, id, data) => {
     try {
+      const existing = db.prepare('SELECT id FROM books WHERE name = ? COLLATE NOCASE AND id != ?').get(data.name, id)
+      if (existing) {
+        return { success: false, error: 'Bu isimde bir cilt zaten var. Lütfen farklı bir isim girin.' }
+      }
+
       db.prepare(
         'UPDATE books SET name = ?, description = ?, book_notes = ?, total_pages = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
       ).run(data.name, data.description || null, data.book_notes || null, data.total_pages || 0, id)

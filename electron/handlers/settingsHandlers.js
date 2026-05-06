@@ -84,13 +84,12 @@ const parseExtraMeta = (relPath) => {
   }
 
   const pageMatch =
-    /^books\/book_(\d+)\/page_(\d+)_([AB])\.(jpg|jpeg|png|webp)$/i.exec(normalized)
+    /^books\/book_(\d+)\/page_(\d+)\.(jpg|jpeg|png|webp)$/i.exec(normalized)
   if (pageMatch) {
     return {
       type: 'page',
       bookId: Number(pageMatch[1]),
       pageNumber: Number(pageMatch[2]),
-      side: pageMatch[3],
     }
   }
 
@@ -230,7 +229,7 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
         .prepare("SELECT id, name, cover_image FROM books WHERE cover_image IS NOT NULL AND cover_image != ''")
         .all()
       const dbPageRows = db
-        .prepare('SELECT id, book_id, page_number, side_a_image, side_b_image FROM pages')
+        .prepare('SELECT id, book_id, page_number, image FROM pages')
         .all()
 
       const dbRefs = []
@@ -247,26 +246,14 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
       })
 
       dbPageRows.forEach((row) => {
-        const sideA = normalizeRelPath(row.side_a_image)
-        const sideB = normalizeRelPath(row.side_b_image)
-        if (sideA) {
+        const imagePath = normalizeRelPath(row.image)
+        if (imagePath) {
           dbRefs.push({
             type: 'page',
             pageId: row.id,
             bookId: row.book_id,
             pageNumber: row.page_number,
-            side: 'A',
-            path: sideA,
-          })
-        }
-        if (sideB) {
-          dbRefs.push({
-            type: 'page',
-            pageId: row.id,
-            bookId: row.book_id,
-            pageNumber: row.page_number,
-            side: 'B',
-            path: sideB,
+            path: imagePath,
           })
         }
       })
@@ -300,7 +287,6 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
             pageId: item.pageId,
             bookId: item.bookId,
             pageNumber: item.pageNumber,
-            side: item.side,
             path: item.path,
           })),
       }
@@ -357,17 +343,10 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
       })
 
       pages.forEach((item) => {
-        const side = String(item?.side || '').toUpperCase()
         const pageId = item?.pageId
         if (!pageId) return
-        if (side === 'B') {
-          db.prepare(
-            'UPDATE pages SET side_b_image = NULL, side_b_uploaded = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-          ).run(pageId)
-          return
-        }
         db.prepare(
-          'UPDATE pages SET side_a_image = NULL, side_a_uploaded = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+          'UPDATE pages SET image = NULL, is_uploaded = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
         ).run(pageId)
       })
 

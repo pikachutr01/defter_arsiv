@@ -23,8 +23,6 @@ const buildPageResults = (rows) =>
     const sources = []
 
     if (row.page_notes) sources.push({ label: 'Sayfa Notu', text: row.page_notes })
-    if (row.side_a_notes) sources.push({ label: 'Sol Taraf Notu', text: row.side_a_notes })
-    if (row.side_b_notes) sources.push({ label: 'Sağ Taraf Notu', text: row.side_b_notes })
 
     return {
       id: `page-${row.id}`,
@@ -60,16 +58,14 @@ export const registerSearchHandlers = ({ ipcMain, db }) => {
       const bookParams = [likeValue, likeValue, likeValue]
 
       let pageSql = `
-        SELECT pages.id, pages.book_id, pages.page_number, pages.page_notes, pages.side_a_notes, pages.side_b_notes,
+        SELECT pages.id, pages.book_id, pages.page_number, pages.page_notes,
                books.name AS book_name
         FROM pages
         JOIN books ON pages.book_id = books.id
         WHERE (
           COALESCE(pages.page_notes, '') LIKE ?
-          OR COALESCE(pages.side_a_notes, '') LIKE ?
-          OR COALESCE(pages.side_b_notes, '') LIKE ?
       `
-      const pageParams = [likeValue, likeValue, likeValue]
+      const pageParams = [likeValue]
 
       if (!Number.isNaN(pageNumber)) {
         pageSql += ' OR pages.page_number = ?'

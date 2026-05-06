@@ -9,16 +9,14 @@ const getStoragePath = (db) =>
   db.prepare('SELECT value FROM settings WHERE key = ?').get('storage_path')
     ?.value || null
 
-const normalizeSide = (side) => (String(side).toUpperCase() === 'B' ? 'B' : 'A')
 
 const ensureDir = (targetPath) => {
   fs.mkdirSync(targetPath, { recursive: true })
 }
 
-const buildImagePaths = (storagePath, bookId, pageNumber, side) => {
-  const safeSide = normalizeSide(side)
+const buildImagePaths = (storagePath, bookId, pageNumber) => {
   const baseFolder = path.join(storagePath, 'books', `book_${bookId}`)
-  const fileBase = `page_${pageNumber}_${safeSide}`
+  const fileBase = `page_${pageNumber}`
 
   return {
     baseFolder,
@@ -28,13 +26,9 @@ const buildImagePaths = (storagePath, bookId, pageNumber, side) => {
   }
 }
 
-const updatePageImage = (db, pageId, side, relativePath, uploaded) => {
-  const safeSide = normalizeSide(side)
-  const columnImage = safeSide === 'A' ? 'side_a_image' : 'side_b_image'
-  const columnUploaded = safeSide === 'A' ? 'side_a_uploaded' : 'side_b_uploaded'
-
+const updatePageImage = (db, pageId, relativePath, uploaded) => {
   db.prepare(
-    `UPDATE pages SET ${columnImage} = ?, ${columnUploaded} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    `UPDATE pages SET image = ?, is_uploaded = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
   ).run(relativePath, uploaded ? 1 : 0, pageId)
 }
 
@@ -73,7 +67,7 @@ const optimizeAndSaveImage = async (sourcePath, targetPath) => {
 }
 
 export const registerImageHandlers = ({ ipcMain, db }) => {
-  const handleUpload = async (pageId, side, sourcePath) => {
+  const handleUpload = async (pageId, sourcePath) => {
     try {
       const storagePath = getStoragePath(db)
       if (!storagePath) {
@@ -88,26 +82,25 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       const imagePaths = buildImagePaths(
         storagePath,
         page.book_id,
-        page.page_number,
-        side
+        page.page_number
       )
 
       ensureDir(imagePaths.baseFolder)
       await optimizeAndSaveImage(sourcePath, imagePaths.originalAbs)
       removeIfExists(imagePaths.legacyThumbAbs)
 
-      updatePageImage(db, pageId, side, imagePaths.originalRel, true)
+      updatePageImage(db, pageId, imagePaths.originalRel, true)
       return { success: true, data: { imagePath: imagePaths.originalRel } }
     } catch (error) {
       return { success: false, error: error.message }
     }
   }
 
-  ipcMain.handle('images:upload', async (_event, pageId, side, sourcePath) =>
-    handleUpload(pageId, side, sourcePath)
+  ipcMain.handle('images:upload', async (_event, pageId, sourcePath) =>
+    handleUpload(pageId, sourcePath)
   )
 
-  ipcMain.handle('images:uploadFromDialog', async (_event, pageId, side) => {
+  ipcMain.handle('images:uploadFromDialog', async (_event, pageId) => {
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openFile'],
@@ -119,13 +112,13 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       }
 
       const sourcePath = result.filePaths[0]
-      return await handleUpload(pageId, side, sourcePath)
+      return await handleUpload(pageId, sourcePath)
     } catch (error) {
       return { success: false, error: error.message }
     }
   })
 
-  ipcMain.handle('images:delete', (_event, pageId, side) => {
+  ipcMain.handle('images:delete', (_event, pageId) => {
     try {
       const storagePath = getStoragePath(db)
       if (!storagePath) {
@@ -142,14 +135,13 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       const imagePaths = buildImagePaths(
         storagePath,
         page.book_id,
-        page.page_number,
-        side
+        page.page_number
       )
 
       removeIfExists(imagePaths.originalAbs)
       removeIfExists(imagePaths.legacyThumbAbs)
 
-      updatePageImage(db, pageId, side, null, false)
+      updatePageImage(db, pageId, null, false)
       return { success: true }
     } catch (error) {
       return { success: false, error: error.message }

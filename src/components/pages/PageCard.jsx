@@ -1,3 +1,6 @@
+import { useMemo } from 'react'
+import usePdfQueueStore from '../../store/usePdfQueueStore.js'
+
 const SideBadge = ({ uploaded, label }) => (
   <div
     className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs ${
@@ -12,25 +15,14 @@ const SideBadge = ({ uploaded, label }) => (
 )
 
 const getPageStateAppearance = (page) => {
-  const uploadedCount =
-    (page.side_a_uploaded === 1 ? 1 : 0) + (page.side_b_uploaded === 1 ? 1 : 0)
+  const isUploaded = page.is_uploaded === 1
 
-  if (uploadedCount === 2) {
+  if (isUploaded) {
     return {
       className: 'border-[var(--success)] hover:border-[var(--success)]',
       style: {
         boxShadow:
           '0 0 0 2px color-mix(in srgb, var(--success) 26%, transparent), var(--shadow-card)',
-      },
-    }
-  }
-
-  if (uploadedCount === 1) {
-    return {
-      className: 'border-[var(--warning)] hover:border-[var(--warning)]',
-      style: {
-        boxShadow:
-          '0 0 0 2px color-mix(in srgb, var(--warning) 24%, transparent), var(--shadow-card)',
       },
     }
   }
@@ -46,21 +38,33 @@ const getPageStateAppearance = (page) => {
 
 export default function PageCard({ page, onSelect }) {
   const appearance = getPageStateAppearance(page)
+  const items = usePdfQueueStore((state) => state.items)
+  const isPdfSelected = useMemo(() => items.some(item => item.pageId === page.id), [items, page.id])
 
   return (
     <button
       type="button"
       onClick={() => onSelect(page)}
       style={appearance.style}
-      className={`flex h-full w-full flex-col gap-3 rounded-2xl border bg-[var(--bg-card)] p-4 text-left transition ${appearance.className}`}
+      className={`relative flex h-full w-full flex-col gap-3 rounded-2xl border bg-[var(--bg-card)] p-4 text-left transition ${appearance.className}`}
     >
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
           Sayfa {page.page_number}
         </span>
+        {isPdfSelected && (
+          <div className="absolute right-3 top-3 text-[var(--danger)]" title="PDF Kuyruğunda">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+              <path d="M16 13H8" />
+              <path d="M16 17H8" />
+              <path d="M10 9H8" />
+            </svg>
+          </div>
+        )}
       </div>
-      <SideBadge uploaded={page.side_a_uploaded === 1} label="Sol Taraf" />
-      <SideBadge uploaded={page.side_b_uploaded === 1} label="Sağ Taraf" />
+      <SideBadge uploaded={page.is_uploaded === 1} label="Fotoğraf" />
     </button>
   )
 }

@@ -10,7 +10,7 @@ export default function Login() {
   const error = useAuthStore((state) => state.error)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const navigate = useNavigate()
-  const [username, setUsername] = useState('admin')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [deviceId, setDeviceId] = useState('')

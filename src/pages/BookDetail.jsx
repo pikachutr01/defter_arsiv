@@ -68,10 +68,10 @@ export default function BookDetail() {
 
   const filteredPages = useMemo(() => {
     if (filter === 'with') {
-      return pages.filter((p) => p.side_a_uploaded === 1 || p.side_b_uploaded === 1)
+      return pages.filter((p) => p.is_uploaded === 1)
     }
     if (filter === 'missing') {
-      return pages.filter((p) => p.side_a_uploaded === 0 || p.side_b_uploaded === 0)
+      return pages.filter((p) => p.is_uploaded === 0)
     }
     return pages
   }, [filter, pages])

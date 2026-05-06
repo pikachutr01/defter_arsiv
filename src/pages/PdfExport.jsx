@@ -32,8 +32,6 @@ const formatFileSize = (bytes) => {
   return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${units[index]}`
 }
 
-const formatSideLabel = (side) =>
-  side === 'A' ? 'Sol Taraf' : side === 'B' ? 'Sağ Taraf' : side
 
 function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving, clearQueue, onToggleClearQueue }) {
   return (
@@ -130,7 +128,7 @@ const PdfQueueCard = memo(function PdfQueueCard({
             {item.bookName || 'Adsız Cilt'}
           </p>
           <p className="text-[11px] text-[var(--text-muted)]">
-            Sayfa {item.pageNumber} • {formatSideLabel(item.side)}
+            Sayfa {item.pageNumber}
             {item.annotatedDataUrl ? (
               <span className="ml-1.5 rounded-full bg-[var(--accent-dim)] px-1.5 py-0.5 text-[10px] text-[var(--accent)]">
                 çizimli
@@ -164,7 +162,7 @@ const PdfQueueCard = memo(function PdfQueueCard({
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={`${item.bookName} ${item.pageNumber} ${formatSideLabel(item.side)}`}
+            alt={`${item.bookName} ${item.pageNumber}`}
             className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
           />
         ) : (
@@ -444,13 +442,13 @@ export default function PdfExport() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {items.map((item, index) => (
                 <PdfQueueCard
-                  key={`${item.pageId}-${item.side}`}
+                  key={item.pageId}
                   item={item}
                   index={index}
                   storagePath={storagePath}
                   onOpenViewer={() => setViewerItem(item)}
-                  onRemove={() => removeItem(item.pageId, item.side)}
-                  onNoteChange={(note) => updateItemNote(item.pageId, item.side, note)}
+                  onRemove={() => removeItem(item.pageId)}
+                  onNoteChange={(note) => updateItemNote(item.pageId, note)}
                   onAnnotate={() => setAnnotatingItem(item)}
                   onDragStart={setDragIndex}
                   onDragOver={handleDragOver}
@@ -496,7 +494,7 @@ export default function PdfExport() {
 
       {viewerItem ? (
         <ImageViewer
-          title={`${viewerItem.bookName} - Sayfa ${viewerItem.pageNumber} - ${formatSideLabel(viewerItem.side)}`}
+          title={`${viewerItem.bookName} - Sayfa ${viewerItem.pageNumber}`}
           imagePath={viewerItem.imagePath}
           onClose={() => setViewerItem(null)}
           panelClassName="max-w-[85vw] w-full"
@@ -520,7 +518,7 @@ export default function PdfExport() {
           item={annotatingItem}
           onClose={() => setAnnotatingItem(null)}
           onSave={(dataUrl) =>
-            updateItemAnnotation(annotatingItem.pageId, annotatingItem.side, dataUrl)
+            updateItemAnnotation(annotatingItem.pageId, dataUrl)
           }
         />
       ) : null}

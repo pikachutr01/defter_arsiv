@@ -9,10 +9,6 @@ import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
 import usePdfQueueStore from '../store/usePdfQueueStore.js'
 
-const formatSideLabel = (side) =>
-  side === 'A' ? 'Sol Taraf' : side === 'B' ? 'Sağ Taraf' : side
-
-// Drag-drop mantığını tek yerde tutar, her iki panel durumunda da kullanılır
 function useDragDrop(onFileDrop) {
   const [isDragging, setIsDragging] = useState(false)
 
@@ -40,12 +36,7 @@ function useDragDrop(onFileDrop) {
 }
 
 const PageImagePanel = memo(function PageImagePanel({
-  sideLabel,
   imagePath,
-  notesValue,
-  placeholderLabel,
-  notesPlaceholder,
-  onNotesChange,
   onUpload,
   onDelete,
   onOpenViewer,
@@ -60,7 +51,7 @@ const PageImagePanel = memo(function PageImagePanel({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-lg">{sideLabel}</h3>
+      <h3 className="text-lg">Sayfa Görseli</h3>
 
       <div
         onDragOver={handleDragOver}
@@ -80,7 +71,7 @@ const PageImagePanel = memo(function PageImagePanel({
             >
               <img
                 src={imageUrl}
-                alt={`${sideLabel} görseli`}
+                alt="Sayfa görseli"
                 className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.01]"
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-[rgba(7,11,18,0.92)] via-[rgba(7,11,18,0.28)] to-transparent px-4 py-3 text-xs text-white/85">
@@ -126,18 +117,10 @@ const PageImagePanel = memo(function PageImagePanel({
           </>
         ) : (
           <div className={`transition ${isDragging ? 'opacity-70' : ''}`}>
-            <ImageUploader label={placeholderLabel} onUpload={onUpload} />
+            <ImageUploader label="Görsel Yükle" onUpload={onUpload} />
           </div>
         )}
       </div>
-
-      <textarea
-        value={notesValue}
-        onChange={onNotesChange}
-        rows={4}
-        placeholder={notesPlaceholder}
-        className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
-      />
     </div>
   )
 })
@@ -147,9 +130,9 @@ export default function PageViewer() {
   const navigate = useNavigate()
   const numericId = Number(pageId)
   const [page, setPage] = useState(null)
-  const [notes, setNotes] = useState({ a: '', b: '', page: '' })
-  const [viewerSide, setViewerSide] = useState(null)
-  const [pendingDeleteSide, setPendingDeleteSide] = useState(null)
+  const [notes, setNotes] = useState({ page: '' })
+  const [isViewerOpen, setIsViewerOpen] = useState(false)
+  const [isPendingDelete, setIsPendingDelete] = useState(false)
   const [isSavingNotes, setIsSavingNotes] = useState(false)
   const storagePath = useSettingsStore((state) => state.storagePath)
   const togglePdfItem = usePdfQueueStore((state) => state.toggleItem)
@@ -159,8 +142,6 @@ export default function PageViewer() {
   const syncPageState = useCallback((data) => {
     setPage(data)
     setNotes({
-      a: data?.side_a_notes || '',
-      b: data?.side_b_notes || '',
       page: data?.page_notes || '',
     })
   }, [])
@@ -182,31 +163,22 @@ export default function PageViewer() {
     }
   }, [numericId, syncPageState])
 
-  // PDF seçim durumlarını her render'da iki ayrı .some() yerine tek seferde türet
-  const { isASelectedForPdf, isBSelectedForPdf } = useMemo(() => {
-    let a = false
-    let b = false
-    for (const item of pdfItems) {
-      if (item.pageId !== numericId) continue
-      if (item.side === 'A') a = true
-      else if (item.side === 'B') b = true
-      if (a && b) break
-    }
-    return { isASelectedForPdf: a, isBSelectedForPdf: b }
+  const isSelectedForPdf = useMemo(() => {
+    return pdfItems.some((item) => item.pageId === numericId)
   }, [pdfItems, numericId])
 
   const runImageUpload = useCallback(
-    async (side, sourcePath = null) => {
+    async (sourcePath = null) => {
       const result = sourcePath
-        ? await ipc.imagesUpload(numericId, side, sourcePath)
-        : await ipc.imagesUploadFromDialog(numericId, side)
+        ? await ipc.imagesUpload(numericId, sourcePath)
+        : await ipc.imagesUploadFromDialog(numericId)
 
       if (result.success) {
         await loadPage()
         showToast({
           variant: 'success',
           title: 'Görsel güncellendi',
-          message: `${formatSideLabel(side)} görseli başarıyla kaydedildi.`,
+          message: 'Sayfa görseli başarıyla kaydedildi.',
         })
         return
       }
@@ -221,16 +193,15 @@ export default function PageViewer() {
   )
 
   const handleDeleteImage = useCallback(async () => {
-    if (!pendingDeleteSide) return
-    const side = pendingDeleteSide
-    const result = await ipc.imagesDelete(numericId, side)
-    setPendingDeleteSide(null)
+    if (!isPendingDelete) return
+    const result = await ipc.imagesDelete(numericId)
+    setIsPendingDelete(false)
     if (result.success) {
       await loadPage()
       showToast({
         variant: 'success',
         title: 'Görsel silindi',
-        message: `${formatSideLabel(side)} görseli kaldırıldı.`,
+        message: 'Sayfa görseli kaldırıldı.',
       })
       return
     }
@@ -239,7 +210,7 @@ export default function PageViewer() {
       title: 'Görsel silinemedi',
       message: result.error || 'Görsel silinirken beklenmeyen bir hata oluştu.',
     })
-  }, [pendingDeleteSide, numericId, loadPage, showToast])
+  }, [isPendingDelete, numericId, loadPage, showToast])
 
   const handleRevealImage = useCallback(
     async (imagePath) => {
@@ -260,8 +231,6 @@ export default function PageViewer() {
     setIsSavingNotes(true)
     const result = await ipc.pagesUpdate(numericId, {
       page_notes: notes.page,
-      side_a_notes: notes.a,
-      side_b_notes: notes.b,
     })
     setIsSavingNotes(false)
     if (result.success) {
@@ -276,74 +245,36 @@ export default function PageViewer() {
     })
   }, [numericId, notes, syncPageState, showToast])
 
-  // Panel handler'ları — stable referans için useCallback, memo ile panel re-render'ını önler
-  const handleNotesChangeA = useCallback(
-    (event) => setNotes((prev) => ({ ...prev, a: event.target.value })),
-    []
-  )
-  const handleNotesChangeB = useCallback(
-    (event) => setNotes((prev) => ({ ...prev, b: event.target.value })),
-    []
-  )
   const handleNotesChangePage = useCallback(
-    (event) => setNotes((prev) => ({ ...prev, page: event.target.value })),
+    (event) => setNotes({ page: event.target.value }),
     []
   )
-  const handleUploadA = useCallback(() => runImageUpload('A'), [runImageUpload])
-  const handleUploadB = useCallback(() => runImageUpload('B'), [runImageUpload])
-  const handleDeleteA = useCallback(() => setPendingDeleteSide('A'), [])
-  const handleDeleteB = useCallback(() => setPendingDeleteSide('B'), [])
-  const handleOpenViewerA = useCallback(() => setViewerSide('A'), [])
-  const handleOpenViewerB = useCallback(() => setViewerSide('B'), [])
-  const handleRevealA = useCallback(
-    () => handleRevealImage(page ? page.side_a_image : null),
+
+  const handleUpload = useCallback(() => runImageUpload(), [runImageUpload])
+  const handleDelete = useCallback(() => setIsPendingDelete(true), [])
+  const handleOpenViewer = useCallback(() => setIsViewerOpen(true), [])
+  const handleReveal = useCallback(
+    () => handleRevealImage(page ? page.image : null),
     [handleRevealImage, page]
   )
-  const handleRevealB = useCallback(
-    () => handleRevealImage(page ? page.side_b_image : null),
-    [handleRevealImage, page]
-  )
-  const handleFileDropA = useCallback(
-    (filePath) => runImageUpload('A', filePath),
+  const handleFileDrop = useCallback(
+    (filePath) => runImageUpload(filePath),
     [runImageUpload]
   )
-  const handleFileDropB = useCallback(
-    (filePath) => runImageUpload('B', filePath),
-    [runImageUpload]
-  )
-  const handleTogglePdfA = useCallback(() => {
-    if (!page?.side_a_image) return
+  const handleTogglePdf = useCallback(() => {
+    if (!page?.image) return
     togglePdfItem({
       pageId: numericId,
-      side: 'A',
-      imagePath: page.side_a_image,
-      pageNumber: page.page_number,
-      bookId: page.book_id,
-      bookName: page.book_name || '',
-    })
-  }, [togglePdfItem, numericId, page])
-  const handleTogglePdfB = useCallback(() => {
-    if (!page?.side_b_image) return
-    togglePdfItem({
-      pageId: numericId,
-      side: 'B',
-      imagePath: page.side_b_image,
+      imagePath: page.image,
       pageNumber: page.page_number,
       bookId: page.book_id,
       bookName: page.book_name || '',
     })
   }, [togglePdfItem, numericId, page])
 
-  const closeViewer = useCallback(() => setViewerSide(null), [])
-  const cancelDelete = useCallback(() => setPendingDeleteSide(null), [])
+  const closeViewer = useCallback(() => setIsViewerOpen(false), [])
+  const cancelDelete = useCallback(() => setIsPendingDelete(false), [])
   const goBack = useCallback(() => navigate(`/books/${page ? page.book_id : ''}`), [navigate, page])
-
-  const viewerImagePath =
-    viewerSide === 'A'
-      ? page?.side_a_image
-      : viewerSide === 'B'
-        ? page?.side_b_image
-        : null
 
   return (
     <section className="space-y-6">
@@ -371,42 +302,18 @@ export default function PageViewer() {
             Sayfa Görüntüle {page?.page_number ? `#${page.page_number}` : ''}
           </h2>
         </div>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Sol ve sağ tarafları yan yana kontrol et.
-        </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6">
         <PageImagePanel
-          sideLabel={formatSideLabel('A')}
-          imagePath={page?.side_a_image}
-          notesValue={notes.a}
-          placeholderLabel="Sol Taraf Yükle"
-          notesPlaceholder="Sol taraf notu"
-          onNotesChange={handleNotesChangeA}
-          onUpload={handleUploadA}
-          onDelete={handleDeleteA}
-          onOpenViewer={handleOpenViewerA}
-          onReveal={handleRevealA}
-          onFileDrop={handleFileDropA}
-          onTogglePdf={handleTogglePdfA}
-          isSelectedForPdf={isASelectedForPdf}
-          storagePath={storagePath}
-        />
-        <PageImagePanel
-          sideLabel={formatSideLabel('B')}
-          imagePath={page?.side_b_image}
-          notesValue={notes.b}
-          placeholderLabel="Sağ Taraf Yükle"
-          notesPlaceholder="Sağ taraf notu"
-          onNotesChange={handleNotesChangeB}
-          onUpload={handleUploadB}
-          onDelete={handleDeleteB}
-          onOpenViewer={handleOpenViewerB}
-          onReveal={handleRevealB}
-          onFileDrop={handleFileDropB}
-          onTogglePdf={handleTogglePdfB}
-          isSelectedForPdf={isBSelectedForPdf}
+          imagePath={page?.image}
+          onUpload={handleUpload}
+          onDelete={handleDelete}
+          onOpenViewer={handleOpenViewer}
+          onReveal={handleReveal}
+          onFileDrop={handleFileDrop}
+          onTogglePdf={handleTogglePdf}
+          isSelectedForPdf={isSelectedForPdf}
           storagePath={storagePath}
         />
       </div>
@@ -420,30 +327,30 @@ export default function PageViewer() {
             disabled={isSavingNotes}
             className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-wait disabled:opacity-70"
           >
-            {isSavingNotes ? 'Kaydediliyor...' : 'Notları Kaydet'}
+            {isSavingNotes ? 'Kaydediliyor...' : 'Notu Kaydet'}
           </button>
         </div>
         <textarea
           value={notes.page}
           onChange={handleNotesChangePage}
-          rows={4}
+          rows={6}
           placeholder="Sayfaya özel not"
           className="w-full rounded-xl border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)]"
         />
       </div>
 
-      {viewerImagePath ? (
+      {isViewerOpen && page?.image ? (
         <ImageViewer
-          title={`${formatSideLabel(viewerSide)} Görüntüle`}
-          imagePath={viewerImagePath}
+          title="Görseli Görüntüle"
+          imagePath={page.image}
           onClose={closeViewer}
         />
       ) : null}
 
-      {pendingDeleteSide ? (
+      {isPendingDelete ? (
         <ConfirmDialog
           title="Görseli Sil"
-          message={`${formatSideLabel(pendingDeleteSide)} görseli kalıcı olarak silinecek. Devam etmek istiyor musun?`}
+          message="Sayfa görseli kalıcı olarak silinecek. Devam etmek istiyor musun?"
           onCancel={cancelDelete}
           onConfirm={handleDeleteImage}
         />

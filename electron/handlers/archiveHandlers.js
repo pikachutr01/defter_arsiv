@@ -58,7 +58,7 @@ export const registerArchiveHandlers = ({ ipcMain, db }) => {
       const pageCount = db.prepare('SELECT COUNT(*) AS count FROM pages').get().count
       const imageCount = db
         .prepare(
-          'SELECT COUNT(*) AS count FROM pages WHERE side_a_uploaded = 1 OR side_b_uploaded = 1'
+          'SELECT COUNT(*) AS count FROM pages WHERE is_uploaded = 1'
         )
         .get().count
 
