@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('settings:deleteOrphanFiles', payload),
     clearMissingRefs: (payload) =>
       ipcRenderer.invoke('settings:clearMissingRefs', payload),
+    getStorageStats: () => ipcRenderer.invoke('settings:getStorageStats'),
   },
   archive: {
     exportFull: () => ipcRenderer.invoke('archive:exportFull'),

@@ -54,6 +54,7 @@ export const ipc = {
     getApi().settings.scanStorageIntegrity(payload),
   settingsDeleteOrphanFiles: (payload) => getApi().settings.deleteOrphanFiles(payload),
   settingsClearMissingRefs: (payload) => getApi().settings.clearMissingRefs(payload),
+  settingsGetStorageStats: () => getApi().settings.getStorageStats(),
   archiveExport: () => getApi().archive.exportFull(),
   archiveImport: () => getApi().archive.importFull(),
   systemGetPathForFile: (file) => getApi().system.getPathForFile(file),

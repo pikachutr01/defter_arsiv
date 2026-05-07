@@ -14,6 +14,15 @@ const formatSideLabel = (side) =>
 
 const pageKey = (item) => `${item.pageId}:${item.side}`
 
+const formatBytes = (bytes, decimals = 2) => {
+  if (!+bytes) return '0 Bayt'
+  const k = 1024
+  const dm = decimals < 0 ? 0 : decimals
+  const sizes = ['Bayt', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
+}
+
 export default function Settings() {
   const location = useLocation()
   const storagePath = useSettingsStore((state) => state.storagePath)
@@ -39,6 +48,23 @@ export default function Settings() {
   const [viewerImagePath, setViewerImagePath] = useState(null)
   const [confirmDeleteExtras, setConfirmDeleteExtras] = useState(null)
   const [confirmClearMissing, setConfirmClearMissing] = useState(null)
+  const [storageStats, setStorageStats] = useState({ totalSize: 0, fileCount: 0 })
+
+  useEffect(() => {
+    let isMounted = true
+    const loadStats = async () => {
+      const result = await ipc.settingsGetStorageStats()
+      if (isMounted && result.success) {
+        setStorageStats(result.data)
+      }
+    }
+    if (storagePath) {
+      loadStats()
+    }
+    return () => {
+      isMounted = false
+    }
+  }, [storagePath])
 
   useEffect(() => {
     if (location.state?.storageError) {
@@ -243,11 +269,19 @@ export default function Settings() {
 
       {/* Depolama Klasörü */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
-        <h3 className="text-lg">Depolama Klasörü</h3>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Varsayılan konum aktif Windows kullanıcısının Belgeler klasörüdür.
-        </p>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg">Depolama Klasörü</h3>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
+              Varsayılan konum aktif Windows kullanıcısının Belgeler klasörüdür.
+            </p>
+          </div>
+          <div className="text-right text-xs text-[var(--text-muted)] border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 rounded-lg min-w-[140px]">
+            <p><span className="font-semibold text-[var(--text-primary)]">Toplam Boyut:</span> {formatBytes(storageStats.totalSize)}</p>
+            <p className="mt-1"><span className="font-semibold text-[var(--text-primary)]">Resim Sayısı:</span> {storageStats.fileCount} adet</p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
             value={storagePath || ''}
             readOnly

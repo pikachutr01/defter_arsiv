@@ -120,6 +120,40 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
     }
   })
 
+  // ── Depolama İstatistikleri ──────────────────────────────────────────────────
+  ipcMain.handle('settings:getStorageStats', async () => {
+    try {
+      const storagePath = getSetting(db, 'storage_path') ?? buildFallbackStoragePath(app)
+      if (!storagePath || !fs.existsSync(storagePath)) {
+        return { success: true, data: { totalSize: 0, fileCount: 0 } }
+      }
+
+      let totalSize = 0
+      let fileCount = 0
+
+      // listImagesRecursively senkron çalışıyor ancak diskte sadece klasörleri okuduğu için oldukça hızlıdır.
+      const fileImages = [
+        ...listImagesRecursively(path.join(storagePath, 'covers'), storagePath),
+        ...listImagesRecursively(path.join(storagePath, 'books'), storagePath),
+      ]
+
+      // Asenkron olarak (ana thread'i kilitlemeden) dosya boyutlarını hesapla
+      const statPromises = fileImages.map(file => fs.promises.stat(file.absPath).catch(() => null))
+      const stats = await Promise.all(statPromises)
+      
+      for (const stat of stats) {
+        if (stat) {
+          totalSize += stat.size
+          fileCount++
+        }
+      }
+
+      return { success: true, data: { totalSize, fileCount } }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
   // ── Ayar Yaz ───────────────────────────────────────────────────────────────
   ipcMain.handle('settings:set', (_event, key, value) => {
     try {
