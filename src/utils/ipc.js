@@ -60,4 +60,6 @@ export const ipc = {
   archiveExport: () => getApi().archive.exportFull(),
   archiveImport: () => getApi().archive.importFull(),
   systemGetPathForFile: (file) => getApi().system.getPathForFile(file),
+  devGetTableData: (payload) => getApi().dev.getTableData(payload),
+  devRawUpdate: (payload) => getApi().dev.rawUpdate(payload),
 }

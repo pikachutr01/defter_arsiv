@@ -88,4 +88,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   system: {
     getPathForFile: (file) => webUtils.getPathForFile(file),
   },
+  dev: {
+    getTableData: (payload) => ipcRenderer.invoke('dev:getTableData', payload),
+    rawUpdate: (payload) => ipcRenderer.invoke('dev:rawUpdate', payload),
+  },
 })

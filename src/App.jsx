@@ -5,6 +5,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import Sidebar from './components/layout/Sidebar.jsx'
 import TopBar from './components/layout/TopBar.jsx'
 import DeveloperResetGateway from './components/layout/DeveloperResetGateway.jsx'
+import DeveloperDataManagerGateway from './components/layout/DeveloperDataManagerGateway.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Login from './pages/Login.jsx'
 import BookDetail from './pages/BookDetail.jsx'
@@ -46,6 +47,7 @@ function AppLayout() {
         <div className="flex-1">
           <TopBar />
           <DeveloperResetGateway />
+          <DeveloperDataManagerGateway />
           <main className="px-8 pb-12 pt-6">
             <Outlet />
           </main>

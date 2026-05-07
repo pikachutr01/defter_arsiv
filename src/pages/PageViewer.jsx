@@ -357,6 +357,12 @@ export default function PageViewer() {
         </div>
       </div>
 
+      {page?.updated_at && (
+        <div className="mt-4 flex justify-end text-[10px] text-[var(--text-muted)] opacity-60">
+          Son değişiklik: {new Intl.DateTimeFormat('tr-TR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(page.updated_at))}
+        </div>
+      )}
+
       {isViewerOpen && page?.image && (
         <ImageViewer
           title="Görseli Görüntüle"

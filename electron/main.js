@@ -16,6 +16,7 @@ import { registerPdfHandlers } from './handlers/pdfHandlers.js'
 import { registerSearchHandlers } from './handlers/searchHandlers.js'
 import { registerSettingsHandlers } from './handlers/settingsHandlers.js'
 import { registerArchiveHandlers } from './handlers/archiveHandlers.js'
+import { registerDeveloperHandlers } from './handlers/developerHandlers.js'
 import { runPendingDeveloperReset } from './developerReset.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -105,6 +106,7 @@ const setupApp = () => {
   registerSearchHandlers({ ipcMain, db })
   registerSettingsHandlers({ ipcMain, db, app })
   registerArchiveHandlers({ ipcMain, db })
+  registerDeveloperHandlers({ ipcMain, db })
 }
 
 app.whenReady().then(() => {
