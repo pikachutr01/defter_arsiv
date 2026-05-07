@@ -261,4 +261,67 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       return { success: false, error: error.message }
     }
   })
+
+  ipcMain.handle('images:bulkUpload', async (event, bookId, sortMethod) => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+      })
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, error: 'Seçim iptal edildi.' }
+      }
+
+      const folderPath = result.filePaths[0]
+      const files = fs.readdirSync(folderPath)
+      const validExts = ['.jpg', '.jpeg', '.png', '.webp']
+      
+      let imageFiles = files
+        .filter(f => validExts.includes(path.extname(f).toLowerCase()))
+        .map(f => {
+          const fullPath = path.join(folderPath, f)
+          const stats = fs.statSync(fullPath)
+          return {
+            name: f,
+            fullPath,
+            time: stats.birthtimeMs || stats.mtimeMs
+          }
+        })
+
+      if (sortMethod === 'date') {
+        imageFiles.sort((a, b) => a.time - b.time)
+      } else {
+        imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+      }
+
+      const pages = db.prepare('SELECT id, page_number FROM pages WHERE book_id = ? ORDER BY page_number ASC').all(bookId)
+
+      if (imageFiles.length !== pages.length) {
+        return { 
+          success: false, 
+          error: `Eşleşme Hatası: Seçilen klasörde ${imageFiles.length} resim bulundu ancak ciltte ${pages.length} sayfa var. Sayıların eşit olması gerekmektedir.` 
+        }
+      }
+
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i]
+        const sourcePath = imageFiles[i].fullPath
+        
+        event.sender.send('images:bulkUploadProgress', { 
+          current: i + 1, 
+          total: pages.length,
+          pageNumber: page.page_number
+        })
+
+        const uploadResult = await handleUpload(page.id, sourcePath)
+        if (!uploadResult.success) {
+          return { success: false, error: `Sayfa ${page.page_number} işlenirken hata oluştu: ${uploadResult.error}` }
+        }
+      }
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
 }

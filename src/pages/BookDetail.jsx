@@ -9,6 +9,62 @@ import BookForm from '../components/books/BookForm.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
 import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
 import ImageViewer from '../components/images/ImageViewer.jsx'
+import Modal from '../components/shared/Modal.jsx'
+
+function BulkUploadModal({ onClose, onStart }) {
+  const [sortMethod, setSortMethod] = useState('date')
+
+  return (
+    <Modal title="Toplu Resim Ekle" onClose={onClose} panelClassName="max-w-2xl">
+      <div className="space-y-4 text-sm text-[var(--text-primary)]">
+        <p>
+          Seçtiğiniz klasördeki resimler sırasıyla bu cildin sayfalarına eklenecektir.
+          <br />
+          <span className="text-[var(--danger-text)] font-semibold mt-1 block">
+            Dikkat: Varsa mevcut resimlerin üzerine yazılacaktır!
+          </span>
+        </p>
+        <div>
+          <label className="mb-2 block text-xs text-[var(--text-muted)]">Sıralama Yöntemi</label>
+          <select
+            value={sortMethod}
+            onChange={e => setSortMethod(e.target.value)}
+            className="w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 outline-none focus:border-[var(--accent)]"
+          >
+            <option value="date" className="bg-[var(--bg-card)] text-[var(--text-primary)]">Oluşturulma Tarihi (Eskiden Yeniye)</option>
+            <option value="name" className="bg-[var(--bg-card)] text-[var(--text-primary)]">Alfabetik (İsim Sırası)</option>
+          </select>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs transition hover:bg-[var(--bg-elevated)]">Vazgeç</button>
+          <button type="button" onClick={() => onStart(sortMethod)} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)]">Klasör Seç ve Başla</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function ProgressModal({ progress }) {
+  const percent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-xl">
+        <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">Toplu Yükleme Yapılıyor</h3>
+        <p className="mb-6 text-sm text-[var(--text-muted)]">
+          Lütfen bekleyin, resimler sıkıştırılarak yükleniyor...<br />
+          <span className="mt-1 block opacity-70">Şu an işlenen sayfa: {progress.pageNumber || '-'}</span>
+        </p>
+        <div className="mb-2 flex justify-between text-xs font-semibold">
+          <span>{percent}%</span>
+          <span>{progress.current} / {progress.total}</span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-elevated)]">
+          <div className="h-full bg-[var(--accent)] transition-all duration-300" style={{ width: `${percent}%` }}></div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const FILTERS = [
   { value: 'all', label: 'Tümü' },
@@ -34,6 +90,10 @@ export default function BookDetail() {
   const [showEditForm, setShowEditForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [viewingImage, setViewingImage] = useState(null)
+
+  const [showBulkModal, setShowBulkModal] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState(null)
+
   const { showToast } = useToast()
 
   const cachedBook = useMemo(
@@ -67,6 +127,13 @@ export default function BookDetail() {
       isMounted = false
     }
   }, [bookId, cachedBook])
+
+  useEffect(() => {
+    const unsubscribe = ipc.onImagesBulkUploadProgress((data) => {
+      setBulkProgress(data)
+    })
+    return () => unsubscribe()
+  }, [])
 
   const filteredPages = useMemo(() => {
     if (filter === 'with') {
@@ -112,6 +179,7 @@ export default function BookDetail() {
       setFetchedBook(result.data)
       setShowEditForm(false)
       setBookNotesDraft(null)
+      loadPagesByBook(bookId)
       showToast({
         variant: 'success',
         title: 'Cilt güncellendi',
@@ -162,6 +230,32 @@ export default function BookDetail() {
   const openDeleteConfirm = useCallback(() => setShowDeleteConfirm(true), [])
   const closeDeleteConfirm = useCallback(() => setShowDeleteConfirm(false), [])
 
+  const handleStartBulkUpload = useCallback(async (sortMethod) => {
+    setShowBulkModal(false)
+    setBulkProgress({ current: 0, total: pages.length, pageNumber: '-' })
+
+    const result = await ipc.imagesBulkUpload(bookId, sortMethod)
+
+    setBulkProgress(null)
+
+    if (result.success) {
+      loadPagesByBook(bookId)
+      showToast({
+        variant: 'success',
+        title: 'Toplu yükleme tamamlandı',
+        message: 'Resimler başarıyla sayfalara eklendi.',
+      })
+    } else {
+      if (result.error !== 'Seçim iptal edildi.') {
+        showToast({
+          variant: 'danger',
+          title: 'Yükleme hatası',
+          message: result.error || 'İşlem sırasında bir hata oluştu.',
+        })
+      }
+    }
+  }, [bookId, pages.length, loadPagesByBook, showToast])
+
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -191,6 +285,13 @@ export default function BookDetail() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setShowBulkModal(true)}
+            className="rounded-lg bg-[var(--accent-dim)] px-4 py-2 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-white"
+          >
+            Toplu Resim Ekle
+          </button>
           <button
             type="button"
             onClick={openEditForm}
@@ -272,6 +373,15 @@ export default function BookDetail() {
           onClose={() => setViewingImage(null)}
         />
       )}
+
+      {showBulkModal && (
+        <BulkUploadModal
+          onClose={() => setShowBulkModal(false)}
+          onStart={handleStartBulkUpload}
+        />
+      )}
+
+      {bulkProgress && <ProgressModal progress={bulkProgress} />}
     </section>
   )
 }

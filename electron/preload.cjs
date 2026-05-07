@@ -43,6 +43,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('images:getThumbnail', imagePath),
     rotate: (pageId) =>
       ipcRenderer.invoke('images:rotate', pageId),
+    bulkUpload: (bookId, sortMethod) =>
+      ipcRenderer.invoke('images:bulkUpload', bookId, sortMethod),
+    onBulkUploadProgress: (callback) => {
+      const listener = (_event, data) => callback(data)
+      ipcRenderer.on('images:bulkUploadProgress', listener)
+      return () => ipcRenderer.removeListener('images:bulkUploadProgress', listener)
+    },
   },
   search: {
     query: (payload) => ipcRenderer.invoke('search:query', payload),

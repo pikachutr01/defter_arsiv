@@ -205,11 +205,34 @@ export const registerBookHandlers = ({ ipcMain, db }) => {
         }
       }
 
+      const currentBook = stmt.getById.get(id)
+      const currentTotal = currentBook.total_pages
+      const newTotal = data.total_pages || 0
+
+      if (newTotal < currentTotal) {
+        const hasData = db.prepare('SELECT id FROM pages WHERE book_id = ? AND page_number > ? AND (is_uploaded = 1 OR page_notes IS NOT NULL) LIMIT 1').get(id, newTotal)
+        if (hasData) {
+          return {
+            success: false,
+            error: `Sayfa sayısını ${newTotal}'a düşüremezsiniz. Çünkü silinecek olan ${newTotal + 1} ile ${currentTotal} numaralı sayfalar arasında not veya resim içeren kayıtlar var. Lütfen önce o sayfaları temizleyin.`
+          }
+        }
+        
+        db.prepare('DELETE FROM pages WHERE book_id = ? AND page_number > ?').run(id, newTotal)
+      } else if (newTotal > currentTotal) {
+        const insertStmt = db.prepare('INSERT INTO pages (book_id, page_number) VALUES (?, ?)')
+        db.transaction(() => {
+          for (let i = currentTotal + 1; i <= newTotal; i++) {
+            insertStmt.run(id, i)
+          }
+        })()
+      }
+
       stmt.updateBook.run(
         data.name,
         data.description || null,
         data.book_notes || null,
-        data.total_pages || 0,
+        newTotal,
         id
       )
 
