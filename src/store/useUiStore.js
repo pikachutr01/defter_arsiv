@@ -1,24 +1,19 @@
 import { create } from 'zustand'
 
-const readInitialSidebarState = () => {
-  if (typeof window === 'undefined') {
-    return false
-  }
+const SIDEBAR_KEY = 'sidebar_collapsed'
+const canUseStorage = typeof window !== 'undefined'
 
-  return window.localStorage.getItem('sidebar_collapsed') === 'true'
-}
+const readInitialSidebarState = () =>
+  canUseStorage && window.localStorage.getItem(SIDEBAR_KEY) === 'true'
 
 const useUiStore = create((set) => ({
   isSidebarCollapsed: readInitialSidebarState(),
+
   toggleSidebar: () =>
     set((state) => {
-      const nextValue = !state.isSidebarCollapsed
-
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('sidebar_collapsed', String(nextValue))
-      }
-
-      return { isSidebarCollapsed: nextValue }
+      const next = !state.isSidebarCollapsed
+      if (canUseStorage) window.localStorage.setItem(SIDEBAR_KEY, String(next))
+      return { isSidebarCollapsed: next }
     }),
 }))
 

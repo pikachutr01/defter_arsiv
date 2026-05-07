@@ -57,16 +57,14 @@ function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving, clea
             onClick={onToggleClearQueue}
             role="switch"
             aria-checked={clearQueue}
-            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 transition-colors duration-200 ${
-              clearQueue
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 transition-colors duration-200 ${clearQueue
                 ? 'border-[var(--accent)] bg-[var(--accent)]'
                 : 'border-[var(--border)] bg-[var(--bg-card)]'
-            }`}
+              }`}
           >
             <span
-              className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                clearQueue ? 'translate-x-5' : 'translate-x-0.5'
-              }`}
+              className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${clearQueue ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
             />
           </button>
         </label>
@@ -116,11 +114,10 @@ const PdfQueueCard = memo(function PdfQueueCard({
       onDragOver={(event) => onDragOver(event, index)}
       onDrop={() => onDrop(index)}
       onDragEnd={() => onDrop(index, true)}
-      className={`rounded-2xl border bg-[var(--bg-card)] p-3 shadow-[var(--shadow-card)] transition ${
-        isDragging
+      className={`rounded-2xl border bg-[var(--bg-card)] p-3 shadow-[var(--shadow-card)] transition ${isDragging
           ? 'scale-[0.985] border-[var(--accent)] opacity-80'
           : 'border-[var(--border)]'
-      }`}
+        }`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -410,22 +407,20 @@ export default function PdfExport() {
         <button
           type="button"
           onClick={() => handleTabChange('create')}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-            activeTab === 'create'
+          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === 'create'
               ? 'bg-[var(--accent)] text-white'
               : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-          }`}
+            }`}
         >
           Oluştur
         </button>
         <button
           type="button"
           onClick={() => handleTabChange('saved')}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-            activeTab === 'saved'
+          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === 'saved'
               ? 'bg-[var(--accent)] text-white'
               : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-          }`}
+            }`}
         >
           Kayıtlı PDF&apos;ler
         </button>

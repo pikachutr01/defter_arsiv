@@ -140,7 +140,7 @@ export const registerSettingsHandlers = ({ ipcMain, db, app }) => {
       // Asenkron olarak (ana thread'i kilitlemeden) dosya boyutlarını hesapla
       const statPromises = fileImages.map(file => fs.promises.stat(file.absPath).catch(() => null))
       const stats = await Promise.all(statPromises)
-      
+
       for (const stat of stats) {
         if (stat) {
           totalSize += stat.size

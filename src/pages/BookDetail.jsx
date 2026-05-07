@@ -211,8 +211,8 @@ export default function BookDetail() {
               type="button"
               onClick={() => setFilter(value)}
               className={`rounded-lg px-4 py-2 text-xs transition ${filter === value
-                  ? 'bg-[var(--accent-dim)] text-[var(--text-primary)]'
-                  : 'border border-[var(--border)] text-[var(--text-muted)]'
+                ? 'bg-[var(--accent-dim)] text-[var(--text-primary)]'
+                : 'border border-[var(--border)] text-[var(--text-muted)]'
                 }`}
             >
               {label}

@@ -6,10 +6,10 @@ import { useImageZoom } from '../../hooks/useImageZoom.js'
 export default function ImageViewer({ title, imagePath, timestamp, onClose, panelClassName = 'max-w-6xl' }) {
   const storagePath = useSettingsStore((state) => state.storagePath)
   const imageUrl = toLocalAssetUrl(storagePath, imagePath, timestamp)
-  const { containerRef, scale, handleMouseDown, isDragging } = useImageZoom({ 
-    maxScale: 6, 
+  const { containerRef, scale, handleMouseDown, isDragging } = useImageZoom({
+    maxScale: 6,
     zoomSpeed: 0.15,
-    enablePan: true 
+    enablePan: true
   })
 
   let cursorClass = 'cursor-zoom-in'
@@ -21,19 +21,19 @@ export default function ImageViewer({ title, imagePath, timestamp, onClose, pane
 
   return (
     <Modal title={title} onClose={onClose} panelClassName={panelClassName}>
-      <div 
+      <div
         ref={containerRef}
         onMouseDown={handleMouseDown}
         className={`max-h-[88vh] overflow-auto rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] select-none ${cursorClass}`}
         title="Ctrl + Fare Tekerleği ile yakınlaştır, sürükleyerek kaydır"
       >
         {imageUrl ? (
-          <img 
-            src={imageUrl} 
-            alt={title} 
+          <img
+            src={imageUrl}
+            alt={title}
             draggable={false}
-            className="mx-auto h-auto block" 
-            style={{ width: `${scale * 100}%`, maxWidth: 'none' }} 
+            className="mx-auto h-auto block"
+            style={{ width: `${scale * 100}%`, maxWidth: 'none' }}
           />
         ) : null}
       </div>

@@ -1,91 +1,61 @@
 import { create } from 'zustand'
 
+// Yeni queue öğesi için varsayılan değerleri uygular
+const applyDefaults = (item, base = {}) => ({
+  ...base,
+  ...item,
+  note: item.note ?? base.note ?? '',
+  annotatedDataUrl: base.annotatedDataUrl ?? null,
+})
+
 const usePdfQueueStore = create((set) => ({
   items: [],
+
+  // Varsa güncelle, yoksa ekle — tek geçişte çözülüyor
   addOrUpdateItem: (item) =>
     set((state) => {
-      const existingIndex = state.items.findIndex(
-        (entry) => entry.pageId === item.pageId
-      )
-
-      if (existingIndex === -1) {
-        return {
-          items: [
-            ...state.items,
-            {
-              ...item,
-              note: item.note || '',
-              annotatedDataUrl: null,
-            },
-          ],
-        }
-      }
-
-      return {
-        items: state.items.map((entry, index) =>
-          index === existingIndex
-            ? {
-                ...entry,
-                ...item,
-                note: item.note ?? entry.note ?? '',
-                annotatedDataUrl: entry.annotatedDataUrl ?? null,
-              }
-            : entry
-        ),
-      }
+      let found = false
+      const nextItems = state.items.map((entry) => {
+        if (entry.pageId !== item.pageId) return entry
+        found = true
+        return applyDefaults(item, entry)
+      })
+      return { items: found ? nextItems : [...state.items, applyDefaults(item)] }
     }),
+
   removeItem: (pageId) =>
-    set((state) => ({
-      items: state.items.filter(
-        (entry) => entry.pageId !== pageId
-      ),
-    })),
+    set((state) => ({ items: state.items.filter((e) => e.pageId !== pageId) })),
+
+  // Varsa çıkar, yoksa ekle
   toggleItem: (item) =>
     set((state) => {
-      const exists = state.items.some(
-        (entry) => entry.pageId === item.pageId
-      )
-
-      if (exists) {
-        return {
-          items: state.items.filter(
-            (entry) => entry.pageId !== item.pageId
-          ),
-        }
-      }
-
+      const exists = state.items.some((e) => e.pageId === item.pageId)
       return {
-        items: [
-          ...state.items,
-          {
-            ...item,
-            note: item.note || '',
-            annotatedDataUrl: null,
-          },
-        ],
+        items: exists
+          ? state.items.filter((e) => e.pageId !== item.pageId)
+          : [...state.items, applyDefaults(item)],
       }
     }),
+
   updateItemNote: (pageId, note) =>
     set((state) => ({
-      items: state.items.map((entry) =>
-        entry.pageId === pageId ? { ...entry, note } : entry
-      ),
+      items: state.items.map((e) => (e.pageId === pageId ? { ...e, note } : e)),
     })),
+
   updateItemAnnotation: (pageId, annotatedDataUrl) =>
     set((state) => ({
-      items: state.items.map((entry) =>
-        entry.pageId === pageId
-          ? { ...entry, annotatedDataUrl }
-          : entry
+      items: state.items.map((e) =>
+        e.pageId === pageId ? { ...e, annotatedDataUrl } : e
       ),
     })),
+
   reorderItems: (fromIndex, toIndex) =>
     set((state) => {
       const nextItems = [...state.items]
-      const [moved] = nextItems.splice(fromIndex, 1)
-      nextItems.splice(toIndex, 0, moved)
+      nextItems.splice(toIndex, 0, nextItems.splice(fromIndex, 1)[0])
       return { items: nextItems }
     }),
+
   clearItems: () => set({ items: [] }),
 }))
 

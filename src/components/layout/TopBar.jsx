@@ -44,7 +44,6 @@ export default function TopBar() {
                 />
               </svg>
             )}
-            <span>{theme === 'dark' ? 'Aydınlık Mod' : 'Karanlık Mod'}</span>
           </button>
           <button
             type="button"

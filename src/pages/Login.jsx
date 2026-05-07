@@ -14,12 +14,20 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [deviceId, setDeviceId] = useState('')
+  const [copySuccess, setCopySuccess] = useState(false)
   const [isResetOpen, setIsResetOpen] = useState(false)
   const [resetToken, setResetToken] = useState('')
   const [resetPassword, setResetPassword] = useState('')
   const [resetConfirm, setResetConfirm] = useState('')
   const [resetStatus, setResetStatus] = useState(null)
   const [isResetting, setIsResetting] = useState(false)
+
+  const handleCopy = () => {
+    if (!deviceId) return
+    navigator.clipboard.writeText(deviceId)
+    setCopySuccess(true)
+    setTimeout(() => setCopySuccess(false), 2000)
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -66,9 +74,9 @@ export default function Login() {
     setIsResetting(false)
 
     if (result.success) {
-      setResetStatus({ 
-        type: 'success', 
-        message: `Şifre sıfırlandı. Kullanıcı adınız: ${result.username}, giriş yapabilirsiniz.` 
+      setResetStatus({
+        type: 'success',
+        message: `Şifre sıfırlandı. Kullanıcı adınız: ${result.username}, giriş yapabilirsiniz.`
       })
       setResetToken('')
       setResetPassword('')
@@ -146,8 +154,27 @@ export default function Login() {
         </form>
 
         {deviceId ? (
-          <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-xs text-[var(--text-muted)]">
-            Cihaz Kimliği: <span className="text-[var(--text-primary)]">{deviceId}</span>
+          <div className="mt-6 flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-xs text-[var(--text-muted)]">
+            <div>
+              Cihaz Kimliği: <span className="text-[var(--text-primary)]">{deviceId}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="ml-3 flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-2 py-1 text-xs text-[var(--text-muted)] transition hover:border-[var(--accent)] hover:text-[var(--text-primary)]"
+              title="Kimliği Kopyala"
+            >
+              {copySuccess ? (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-[var(--success)]"><polyline points="20 6 9 17 4 12" /></svg>
+                  <span className="text-[var(--success)]">Kopyalandı</span>
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                </>
+              )}
+            </button>
           </div>
         ) : null}
       </div>

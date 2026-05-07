@@ -29,11 +29,10 @@ const IconButtonWithTooltip = ({
 
 const SideBadge = ({ uploaded, label, note, onViewImage }) => (
   <div
-    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs ${
-      uploaded
+    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs ${uploaded
         ? 'border-[var(--accent)] text-[var(--text-primary)]'
         : 'border-[var(--border)] text-[var(--text-muted)]'
-    }`}
+      }`}
   >
     <span>{label}</span>
     <div className="flex items-center gap-2">

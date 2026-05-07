@@ -101,9 +101,8 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`flex shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-6 transition-[width,padding] duration-300 ${
-        isSidebarCollapsed ? 'w-24' : 'w-72'
-      }`}
+      className={`flex shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-6 transition-[width,padding] duration-300 ${isSidebarCollapsed ? 'w-24' : 'w-72'
+        }`}
     >
       <div className={`mb-10 ${isSidebarCollapsed ? 'items-center' : ''} flex flex-col`}>
         <div className="flex w-full items-start justify-between gap-3">
@@ -149,12 +148,10 @@ export default function Sidebar() {
             to={item.to}
             end={item.to === '/'}
             className={({ isActive }) =>
-              `group flex items-center rounded-xl transition ${
-                isSidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'
-              } ${
-                isActive
-                  ? 'bg-[var(--accent-dim)] text-[var(--text-primary)] shadow-[var(--shadow-card)]'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
+              `group flex items-center rounded-xl transition ${isSidebarCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'
+              } ${isActive
+                ? 'bg-[var(--accent-dim)] text-[var(--text-primary)] shadow-[var(--shadow-card)]'
+                : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
               }`
             }
             title={isSidebarCollapsed ? item.label : undefined}
@@ -173,9 +170,8 @@ export default function Sidebar() {
               )}
             </span>
             <span
-              className={`flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-300 ${
-                isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'
-              }`}
+              className={`flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'
+                }`}
             >
               {item.label}
             </span>
@@ -194,9 +190,8 @@ export default function Sidebar() {
       </nav>
 
       <div
-        className={`mt-10 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 text-xs text-[var(--text-muted)] transition-all duration-300 ${
-          isSidebarCollapsed ? 'pointer-events-none max-h-0 overflow-hidden border-transparent p-0 opacity-0' : 'max-h-40 opacity-100'
-        }`}
+        className={`mt-10 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 text-xs text-[var(--text-muted)] transition-all duration-300 ${isSidebarCollapsed ? 'pointer-events-none max-h-0 overflow-hidden border-transparent p-0 opacity-0' : 'max-h-40 opacity-100'
+          }`}
       >
         Fotoğraf durumunu, arama sonuçlarını ve dışa aktarımları buradan yönetin.
       </div>

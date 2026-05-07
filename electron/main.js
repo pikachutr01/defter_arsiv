@@ -47,13 +47,21 @@ const registerLocalAssetProtocol = () => {
   })
 }
 
+const getIconPath = () => {
+  if (isDev) {
+    return path.join(__dirname, '..', 'assets', 'icon.ico')
+  }
+  return path.join(process.resourcesPath, 'assets', 'icon.ico')
+}
+
 const createMainWindow = () => {
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: 1800,
+    height: 1000,
     minWidth: 1024,
     minHeight: 600,
     title: 'Cilt Dijital Kayıt Sistemi',
+    icon: getIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,

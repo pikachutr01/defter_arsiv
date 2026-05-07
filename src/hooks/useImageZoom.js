@@ -13,12 +13,12 @@ export function useImageZoom({ minScale = 1, maxScale = 5, zoomSpeed = 0.1, enab
     const handleWheel = (e) => {
       // Sadece Ctrl tuşuna basılıyken çalışsın
       if (!e.ctrlKey) return
-      
+
       // Tarayıcının varsayılan sayfa yakınlaştırmasını engelle
       e.preventDefault()
 
       const rect = container.getBoundingClientRect()
-      
+
       // Fare pozisyonu (konteynerin görünen kısmına göre)
       const mouseX = e.clientX - rect.left
       const mouseY = e.clientY - rect.top
@@ -33,7 +33,7 @@ export function useImageZoom({ minScale = 1, maxScale = 5, zoomSpeed = 0.1, enab
         // DeltaY negatifse yukarı kaydırma (yakınlaştır), pozitifse aşağı (uzaklaştır)
         const delta = e.deltaY < 0 ? zoomSpeed : -zoomSpeed
         const next = Math.min(Math.max(prev + delta, minScale), maxScale)
-        
+
         // Sınır değere ulaşıldıysa işlem yapma
         if (next === prev) return prev
 
@@ -81,7 +81,7 @@ export function useImageZoom({ minScale = 1, maxScale = 5, zoomSpeed = 0.1, enab
     const handleMouseMove = (e) => {
       const container = containerRef.current
       if (!container) return
-      
+
       const dx = e.clientX - dragStartRef.current.x
       const dy = e.clientY - dragStartRef.current.y
 

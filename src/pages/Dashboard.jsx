@@ -124,9 +124,9 @@ export default function Dashboard() {
       return
     }
     showToast({
-        variant: 'danger',
-        title: 'Cilt silinemedi',
-        message: result.error || 'Cilt silinirken beklenmeyen bir hata oluştu.',
+      variant: 'danger',
+      title: 'Cilt silinemedi',
+      message: result.error || 'Cilt silinirken beklenmeyen bir hata oluştu.',
     })
   }, [pendingDeleteBook, deleteBook, showToast])
 
