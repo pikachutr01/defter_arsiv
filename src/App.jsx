@@ -9,7 +9,6 @@ import DeveloperDataManagerGateway from './components/layout/DeveloperDataManage
 import Dashboard from './pages/Dashboard.jsx'
 import Login from './pages/Login.jsx'
 import BookDetail from './pages/BookDetail.jsx'
-import PageViewer from './pages/PageViewer.jsx'
 import Search from './pages/Search.jsx'
 import PdfExport from './pages/PdfExport.jsx'
 import Settings from './pages/Settings.jsx'
@@ -71,7 +70,6 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="books/:id" element={<BookDetail />} />
-          <Route path="books/:id/pages/:pageId" element={<PageViewer />} />
           <Route path="search" element={<Search />} />
           <Route path="pdf-export" element={<PdfExport />} />
           <Route path="settings" element={<Settings />} />

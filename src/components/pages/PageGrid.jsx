@@ -11,15 +11,40 @@ const gridComponents = {
   ))
 }
 
-export default function PageGrid({ pages, onSelect, onViewImage }) {
+export default function PageGrid({ 
+  pages, 
+  onViewImage,
+  onUpload,
+  onDelete,
+  onRotate,
+  onTogglePdf,
+  onReveal,
+  onEditNote,
+  pdfItems,
+  virtuosoRef
+}) {
   return (
     <VirtuosoGrid
+      ref={virtuosoRef}
       useWindowScroll
       data={pages}
       components={gridComponents}
-      itemContent={(index, page) => (
-        <PageCard page={page} onSelect={onSelect} onViewImage={onViewImage} />
-      )}
+      itemContent={(index, page) => {
+        const isPdfSelected = pdfItems.some(item => item.pageId === page.id);
+        return (
+          <PageCard 
+            page={page} 
+            onViewImage={onViewImage} 
+            onUpload={onUpload}
+            onDelete={onDelete}
+            onRotate={onRotate}
+            onTogglePdf={onTogglePdf}
+            onReveal={onReveal}
+            onEditNote={onEditNote}
+            isPdfSelected={isPdfSelected}
+          />
+        )
+      }}
     />
   )
 }

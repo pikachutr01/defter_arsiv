@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 
-export default function Modal({ title, children, onClose, panelClassName = '' }) {
+export default function Modal({ title, children, onClose, panelClassName = '', disableBackdropClick = false }) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') onClose()
@@ -11,9 +11,10 @@ export default function Modal({ title, children, onClose, panelClassName = '' })
 
   const handleBackdropClick = useCallback(
     (event) => {
+      if (disableBackdropClick) return
       if (event.target === event.currentTarget) onClose()
     },
-    [onClose]
+    [onClose, disableBackdropClick]
   )
 
   return (

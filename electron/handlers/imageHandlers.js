@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
+import heicConvert from 'heic-convert'
 import { dialog, shell } from 'electron'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -54,9 +55,29 @@ const getImageQuality = (db) => {
   return row ? parseInt(row.value, 10) : 80
 }
 
+const HEIC_EXTS = new Set(['.heic', '.heif'])
+
+/**
+ * HEIC/HEIF kaynak dosyasını JPEG Buffer'a dönüştürür.
+ * Diğer formatlarda null döner (sharp doğrudan işler).
+ */
+const convertHeicToBuffer = async (sourcePath) => {
+  const ext = path.extname(sourcePath).toLowerCase()
+  if (!HEIC_EXTS.has(ext)) return null
+  const inputBuffer = fs.readFileSync(sourcePath)
+  const outputBuffer = await heicConvert({
+    buffer: inputBuffer,
+    format: 'JPEG',
+    quality: 1, // heic-convert kalite 0–1 arası
+  })
+  return Buffer.from(outputBuffer)
+}
+
 const optimizeAndSaveImage = async (db, sourcePath, targetPath) => {
   const quality = getImageQuality(db)
-  const instance = sharp(sourcePath, { failOn: 'none' }).rotate()
+  const heicBuffer = await convertHeicToBuffer(sourcePath)
+  const sharpInput = heicBuffer ?? sourcePath
+  const instance = sharp(sharpInput, { failOn: 'none' }).rotate()
   const metadata = await instance.metadata()
 
   const pipeline = metadata.hasAlpha
@@ -114,7 +135,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openFile'],
-        filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
+        filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'] }],
       })
 
       if (result.canceled || result.filePaths.length === 0) {
@@ -274,7 +295,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
 
       const folderPath = result.filePaths[0]
       const files = fs.readdirSync(folderPath)
-      const validExts = ['.jpg', '.jpeg', '.png', '.webp']
+      const validExts = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
       
       let imageFiles = files
         .filter(f => validExts.includes(path.extname(f).toLowerCase()))

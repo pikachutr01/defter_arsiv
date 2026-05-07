@@ -46,41 +46,24 @@ export default function Help() {
           </div>
         </article>
 
-        {/* Cilt Detay */}
+        {/* Cilt Detay ve Sayfa Yönetimi */}
         <article className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
           <div className="bg-[var(--bg-sidebar)] px-6 py-4 border-b border-[var(--border)]">
             <h3 className="text-xl font-medium text-[var(--text-primary)] flex items-center gap-2">
               <span className="bg-[var(--accent-dim)] text-[var(--accent)] p-2 rounded-lg text-sm">3</span>
-              Cilt Detay Sayfası
+              Cilt Detay ve Sayfa Yönetimi
             </h3>
           </div>
           <div className="p-6 space-y-4 text-[var(--text-muted)] text-sm leading-relaxed">
-            <p>Ana sayfadan bir cilde tıkladığınızda o cildin içindeki sayfaların durumunu detaylıca yönettiğiniz ekrandır.</p>
+            <p>Ana sayfadan bir cilde tıkladığınızda o cildin içindeki tüm sayfaların durumunu yönettiğiniz ve sayfalarla ilgili tüm işlemleri gerçekleştirdiğiniz ana ekrandır. Başka bir ekrana geçmeden her şeyi doğrudan kartlar üzerinden yapabilirsiniz.</p>
             <ul className="list-inside list-disc space-y-2 ml-2">
-              <li><strong>Sayfa Izgarası (Grid):</strong> Cilde ait tüm sayfalar kutucuklar halinde listelenir. Hangi sayfaların fotoğrafının çekildiğini, hangilerinin boş olduğunu renk kodlarıyla görebilirsiniz.</li>
+              <li><strong>Sayfa Kartları:</strong> Cilde ait tüm sayfalar kartlar halinde listelenir. Hangi sayfaların fotoğrafının çekildiğini, hangilerinin boş olduğunu görebilirsiniz.</li>
+              <li><strong>Fotoğraf Yükleme:</strong> Doğrudan bilgisayarınızdan bir fotoğrafı sürükleyip sayfa kartının üzerine bırakarak (Sürükle & Bırak) hızlıca yükleyebilirsiniz. Veya resim yüklenmemiş kartların üzerine tıklayarak dosyalarınızdan seçebilirsiniz.</li>
+              <li><strong>Araç Çubuğu (Görsel İşlemleri):</strong> Resim yüklenmiş sayfaların altında özel bir araç çubuğu belirir. Buradan resmi PDF sırasına ekleyebilir, başka bir resimle değiştirebilir, 90 derece sola döndürebilir (rotasyon), silebilir veya tam boyut büyüterek inceleyebilirsiniz.</li>
+              <li><strong>Tam Boyut İnceleme (Pan & Zoom):</strong> Resmi büyüttüğünüzde (göz ikonuna basıldığında) <strong>Ctrl + Fare Tekerleği</strong> ile resmi imlecin bulunduğu yöne doğru yakınlaştırıp uzaklaştırabilir, farenizin sol tuşuna basılı tutarak resmi dilediğiniz yöne <strong>sürükleyip (pan)</strong> rahatça inceleyebilirsiniz.</li>
+              <li><strong>Sayfa Notları:</strong> Her sayfa için özel notlar ekleyebilirsiniz. Araç çubuğundaki not ikonuna tıklayarak açılan pencereden notunuzu yazabilirsiniz. Kayıtlı notu olan sayfaların not ikonuna fareyle geldiğinizde not içeriği hızlıca gösterilir.</li>
               <li><strong>Filtreleme:</strong> Üst menüden "Tümü", "Fotoğraflı" veya "Eksik" filtrelerini kullanarak yalnızca eksik olan sayfaları hızlıca listeleyebilirsiniz.</li>
-              <li><strong>Cilt Notu:</strong> Sadece bu cildi ilgilendiren özel notlar veya özet bilgileri yazıp kaydedebileceğiniz geniş bir metin kutusu bulunur.</li>
-              <li><strong>Hızlı Görüntüleme:</strong> Zaten yüklenmiş bir fotoğraf varsa kutucuğun üzerindeki göz ikonuna tıklayarak fotoğrafı büyütebilirsiniz. Kutucuğa tıklamak ise sayfanın düzenleme ekranını açar.</li>
-            </ul>
-          </div>
-        </article>
-
-        {/* Sayfa Görüntüleyici */}
-        <article className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
-          <div className="bg-[var(--bg-sidebar)] px-6 py-4 border-b border-[var(--border)]">
-            <h3 className="text-xl font-medium text-[var(--text-primary)] flex items-center gap-2">
-              <span className="bg-[var(--accent-dim)] text-[var(--accent)] p-2 rounded-lg text-sm">4</span>
-              Sayfa Görüntüleme ve Düzenleme
-            </h3>
-          </div>
-          <div className="p-6 space-y-4 text-[var(--text-muted)] text-sm leading-relaxed">
-            <p>Fiziksel bir defterin sayfasını simüle eden bu ekranda seçili sayfa üzerinde işlem yaparsınız.</p>
-            <ul className="list-inside list-disc space-y-2 ml-2">
-              <li><strong>Fotoğraf Yükleme:</strong> Sürükle & Bırak yaparak veya butona tıklayarak o sayfa için fotoğraf yükleyebilirsiniz. Yüklenen fotoğraflar sistem tarafından optimize edilir.</li>
-              <li><strong>Görsel İşlemleri:</strong> Yüklenen fotoğrafı 90 derece sola döndürebilir (Rotasyon), silebilir veya büyüterek inceleyebilirsiniz. Resmi büyüttüğünüzde (ön izleme modunda) <strong>Ctrl + Fare Tekerleği</strong> ile resmi fare imlecinizin bulunduğu yere doğru yakınlaştırıp uzaklaştırabilir, farenizin sol tuşuna basılı tutarak resmi dilediğiniz yöne <strong>sürükleyip (pan)</strong> rahatça inceleyebilirsiniz.</li>
-              <li><strong>Sayfa Notları:</strong> Sayfaya özel notlar düşebilirsiniz. Notu yazdıktan sonra mutlaka "Notu Kaydet" butonuna basmalısınız.</li>
-              <li><strong>PDF Sırasına Ekleme:</strong> Sayfadaki önemli bir veriyi dışa aktarmak istiyorsanız görselin köşesindeki "PDF Sırasına Ekle / Çıkar" butonuyla belgeyi dışa aktarma sepetinize gönderebilirsiniz.</li>
-              <li><strong>Hızlı Gezinme:</strong> "Önceki Sayfa" ve "Sonraki Sayfa" butonlarını kullanarak veya klavyenizin sağ/sol yön tuşlarıyla sayfalar arasında sayfadan çıkmadan seri şekilde geçiş yapabilirsiniz.</li>
+              <li><strong>Cilt Notu:</strong> Sadece bu cildi ilgilendiren özel notlar veya özet bilgileri yazıp kaydedebileceğiniz metin kutusu bulunur.</li>
             </ul>
           </div>
         </article>
@@ -89,7 +72,7 @@ export default function Help() {
         <article className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
           <div className="bg-[var(--bg-sidebar)] px-6 py-4 border-b border-[var(--border)]">
             <h3 className="text-xl font-medium text-[var(--text-primary)] flex items-center gap-2">
-              <span className="bg-[var(--accent-dim)] text-[var(--accent)] p-2 rounded-lg text-sm">5</span>
+              <span className="bg-[var(--accent-dim)] text-[var(--accent)] p-2 rounded-lg text-sm">4</span>
               Arama Ekranı
             </h3>
           </div>
@@ -107,7 +90,7 @@ export default function Help() {
         <article className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
           <div className="bg-[var(--bg-sidebar)] px-6 py-4 border-b border-[var(--border)]">
             <h3 className="text-xl font-medium text-[var(--text-primary)] flex items-center gap-2">
-              <span className="bg-[var(--accent-dim)] text-[var(--accent)] p-2 rounded-lg text-sm">6</span>
+              <span className="bg-[var(--accent-dim)] text-[var(--accent)] p-2 rounded-lg text-sm">5</span>
               PDF Oluştur
             </h3>
           </div>
@@ -125,7 +108,7 @@ export default function Help() {
         <article className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
           <div className="bg-[var(--bg-sidebar)] px-6 py-4 border-b border-[var(--border)]">
             <h3 className="text-xl font-medium text-[var(--text-primary)] flex items-center gap-2">
-              <span className="bg-[var(--accent-dim)] text-[var(--accent)] p-2 rounded-lg text-sm">7</span>
+              <span className="bg-[var(--accent-dim)] text-[var(--accent)] p-2 rounded-lg text-sm">6</span>
               Ayarlar ve Yedekleme
             </h3>
           </div>

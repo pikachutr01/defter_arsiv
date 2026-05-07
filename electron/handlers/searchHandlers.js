@@ -55,14 +55,14 @@ export const registerSearchHandlers = ({ ipcMain, db }) => {
 
       const selectBook = `
         SELECT 'book' as entity_type, id as entity_id, id as book_id, NULL as page_id, NULL as page_number, 
-               name as book_name, name as title, description, book_notes as match_notes, cover_image, total_pages 
+               name as book_name, name as title, description, book_notes as match_notes, cover_image, total_pages, NULL as image 
         FROM books
         ${bookWhere ? 'WHERE ' + bookWhere : 'WHERE 0'}
       `
 
       const selectPage = `
         SELECT 'page' as entity_type, pages.id as entity_id, books.id as book_id, pages.id as page_id, pages.page_number, 
-               books.name as book_name, books.name as title, NULL as description, pages.page_notes as match_notes, NULL as cover_image, NULL as total_pages
+               books.name as book_name, books.name as title, NULL as description, pages.page_notes as match_notes, NULL as cover_image, NULL as total_pages, pages.image as image
         FROM pages
         JOIN books ON pages.book_id = books.id
         ${pageWhere ? 'WHERE ' + pageWhere : 'WHERE 0'}
@@ -154,6 +154,7 @@ export const registerSearchHandlers = ({ ipcMain, db }) => {
             page_number: row.page_number,
             book_name: row.book_name,
             match_sources: sources,
+            image: row.image,
           }
         }
       })

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, memo } from 'react'
 import Modal from '../components/shared/Modal.jsx'
 import EmptyState from '../components/shared/EmptyState.jsx'
+import SearchBar from '../components/shared/SearchBar.jsx'
 import ImageViewer from '../components/images/ImageViewer.jsx'
 import AnnotationCanvas from '../components/images/AnnotationCanvas.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
@@ -35,7 +36,7 @@ const formatFileSize = (bytes) => {
 
 function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving, clearQueue, onToggleClearQueue }) {
   return (
-    <Modal title="PDF Adı" onClose={onClose} panelClassName="max-w-xl">
+    <Modal title="PDF Adı" onClose={onClose} panelClassName="max-w-xl" disableBackdropClick>
       <div className="space-y-4">
         <p className="text-sm text-[var(--text-muted)]">
           PDF dosyasına verilecek adı yaz. Dosya pdf klasörüne kaydedilecek.
@@ -264,9 +265,16 @@ export default function PdfExport() {
   const [pdfFileName, setPdfFileName] = useState('')
   const [clearQueueOnSuccess, setClearQueueOnSuccess] = useState(false)
   const [pendingDeletePdf, setPendingDeletePdf] = useState(null)
+  const [pdfSearchQuery, setPdfSearchQuery] = useState('')
   const { showToast } = useToast()
 
   const queueCountLabel = useMemo(() => `${items.length} görsel seçildi`, [items.length])
+
+  const filteredSavedPdfs = useMemo(() => {
+    if (!pdfSearchQuery.trim()) return savedPdfs
+    const lowerQuery = pdfSearchQuery.toLocaleLowerCase('tr')
+    return savedPdfs.filter((pdf) => pdf.name.toLocaleLowerCase('tr').includes(lowerQuery))
+  }, [savedPdfs, pdfSearchQuery])
 
   const loadSavedPdfs = useCallback(async () => {
     setIsLoadingPdfs(true)
@@ -290,6 +298,7 @@ export default function PdfExport() {
   const handleTabChange = async (tab) => {
     setActiveTab(tab)
     if (tab === 'saved') {
+      setPdfSearchQuery('')
       await loadSavedPdfs()
     }
   }
@@ -323,6 +332,7 @@ export default function PdfExport() {
         title: 'PDF oluşturuldu',
         message: `${result.data.fileName} oluşturuldu ve kaydedildi.`,
       })
+      await ipc.pdfOpen(result.data.filePath)
       return
     }
 
@@ -474,16 +484,31 @@ export default function PdfExport() {
           description="Oluşturduğun PDF dosyaları burada listelenecek."
         />
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {savedPdfs.map((item) => (
-            <PdfSavedCard
-              key={item.id}
-              item={item}
-              onOpen={() => handleOpenPdf(item.filePath)}
-              onFind={() => handleFindPdf(item.filePath)}
-              onDelete={() => setPendingDeletePdf(item)}
+        <div className="space-y-4">
+          <div className="max-w-md">
+            <SearchBar
+              value={pdfSearchQuery}
+              onChange={setPdfSearchQuery}
+              placeholder="Kayıtlı PDF'ler arasında ara..."
             />
-          ))}
+          </div>
+          {filteredSavedPdfs.length === 0 ? (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-8 text-center text-sm text-[var(--text-muted)]">
+              Arama kriterlerine uygun PDF bulunamadı.
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {filteredSavedPdfs.map((item) => (
+                <PdfSavedCard
+                  key={item.id}
+                  item={item}
+                  onOpen={() => handleOpenPdf(item.filePath)}
+                  onFind={() => handleFindPdf(item.filePath)}
+                  onDelete={() => setPendingDeletePdf(item)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

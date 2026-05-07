@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import useBookStore from '../store/useBookStore.js'
 import usePageStore from '../store/usePageStore.js'
+import usePdfQueueStore from '../store/usePdfQueueStore.js'
 import PageGrid from '../components/pages/PageGrid.jsx'
 import EmptyState from '../components/shared/EmptyState.jsx'
 import { ipc } from '../utils/ipc.js'
@@ -12,7 +13,7 @@ import ImageViewer from '../components/images/ImageViewer.jsx'
 import Modal from '../components/shared/Modal.jsx'
 
 function BulkUploadModal({ onClose, onStart }) {
-  const [sortMethod, setSortMethod] = useState('date')
+  const [sortMethod, setSortMethod] = useState('name')
 
   return (
     <Modal title="Toplu Resim Ekle" onClose={onClose} panelClassName="max-w-2xl">
@@ -66,6 +67,27 @@ function ProgressModal({ progress }) {
   )
 }
 
+function NoteModal({ page, draft, onChange, onSave, onClose }) {
+  if (!page) return null
+  return (
+    <Modal title={`Sayfa ${page.page_number} Notu`} onClose={onClose} panelClassName="max-w-2xl">
+      <div className="space-y-4 text-sm text-[var(--text-primary)]">
+        <textarea
+          value={draft}
+          onChange={e => onChange(e.target.value)}
+          rows={10}
+          placeholder="Bu sayfa için alınacak notlar..."
+          className="w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+        />
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="rounded-lg border border-[var(--border)] px-4 py-2 text-xs transition hover:bg-[var(--bg-elevated)]">Vazgeç</button>
+          <button type="button" onClick={onSave} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)]">Kaydet</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 const FILTERS = [
   { value: 'all', label: 'Tümü' },
   { value: 'with', label: 'Fotoğraflı' },
@@ -75,7 +97,9 @@ const FILTERS = [
 export default function BookDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const bookId = Number(id)
+  const virtuosoRef = useRef(null)
 
   const books = useBookStore((state) => state.books)
   const updateBook = useBookStore((state) => state.updateBook)
@@ -93,8 +117,16 @@ export default function BookDetail() {
 
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkProgress, setBulkProgress] = useState(null)
+  
+  const [editingNotePage, setEditingNotePage] = useState(null)
+  const [pageNoteDraft, setPageNoteDraft] = useState('')
+  const [pageToDeleteImage, setPageToDeleteImage] = useState(null)
 
   const { showToast } = useToast()
+  
+  const pdfItems = usePdfQueueStore((state) => state.items)
+  const togglePdfItem = usePdfQueueStore((state) => state.toggleItem)
+  const removePdfItem = usePdfQueueStore((state) => state.removeItem)
 
   const cachedBook = useMemo(
     () => books.find((item) => item.id === bookId) ?? null,
@@ -144,6 +176,20 @@ export default function BookDetail() {
     }
     return pages
   }, [filter, pages])
+
+  const scrollToPageId = searchParams.get('scrollTo')
+  useEffect(() => {
+    if (scrollToPageId && filteredPages.length > 0 && virtuosoRef.current) {
+      const index = filteredPages.findIndex((p) => p.id === Number(scrollToPageId))
+      if (index !== -1) {
+        setTimeout(() => {
+          virtuosoRef.current?.scrollToIndex({ index, align: 'center', behavior: 'smooth' })
+        }, 100)
+      }
+      searchParams.delete('scrollTo')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [scrollToPageId, filteredPages, searchParams, setSearchParams])
 
   const handleSaveNotes = useCallback(async () => {
     if (!book) return
@@ -219,10 +265,84 @@ export default function BookDetail() {
     setBookNotesDraft(event.target.value)
   }, [])
 
-  const handleSelectPage = useCallback(
-    (page) => navigate(`/books/${bookId}/pages/${page.id}`),
-    [navigate, bookId]
-  )
+  const handleTogglePdf = useCallback((page) => {
+    if (!page?.image) return
+    togglePdfItem({
+      pageId: page.id,
+      imagePath: page.image,
+      pageNumber: page.page_number,
+      bookId: page.book_id,
+      bookName: book?.name || '',
+    })
+  }, [togglePdfItem, book])
+
+  const handleUploadImage = useCallback(async (pageId, sourcePath = null) => {
+    const result = sourcePath
+      ? await ipc.imagesUpload(pageId, sourcePath)
+      : await ipc.imagesUploadFromDialog(pageId)
+
+    if (result.success) {
+      loadPagesByBook(bookId)
+      showToast({ variant: 'success', title: 'Görsel güncellendi', message: 'Sayfa görseli başarıyla kaydedildi.' })
+      removePdfItem(pageId)
+      return
+    }
+    if (result.error === 'Seçim iptal edildi.') return
+    showToast({ variant: 'danger', title: 'Görsel yüklenemedi', message: result.error || 'Görsel seçilirken beklenmeyen bir sorun oluştu.' })
+  }, [bookId, loadPagesByBook, showToast, removePdfItem])
+
+  const handleDeleteImage = useCallback(async () => {
+    if (!pageToDeleteImage) return;
+    
+    const result = await ipc.imagesDelete(pageToDeleteImage)
+    if (result.success) {
+      removePdfItem(pageToDeleteImage)
+      loadPagesByBook(bookId)
+      showToast({ variant: 'success', title: 'Görsel silindi', message: 'Sayfa görseli kaldırıldı.' })
+    } else {
+      showToast({ variant: 'danger', title: 'Görsel silinemedi', message: result.error || 'Görsel silinirken beklenmeyen bir hata oluştu.' })
+    }
+    setPageToDeleteImage(null)
+  }, [pageToDeleteImage, bookId, loadPagesByBook, showToast, removePdfItem])
+
+  const confirmDeleteImage = useCallback((pageId) => {
+    setPageToDeleteImage(pageId)
+  }, [])
+
+  const handleRotateImage = useCallback(async (pageId) => {
+    const result = await ipc.imagesRotate(pageId)
+    if (result.success) {
+      loadPagesByBook(bookId)
+      showToast({ variant: 'success', title: 'Görsel döndürüldü', message: 'Resim sola döndürüldü.' })
+    } else {
+      showToast({ variant: 'danger', title: 'Döndürme başarısız', message: result.error || 'Resim döndürülürken bir hata oluştu.' })
+    }
+  }, [bookId, loadPagesByBook, showToast])
+
+  const handleRevealImage = useCallback(async (imagePath) => {
+    if (!imagePath) return
+    const result = await ipc.imagesRevealInFolder(imagePath)
+    if (!result.success) {
+      showToast({ variant: 'danger', title: 'Klasör açılamadı', message: result.error || 'Görselin bulunduğu klasör açılamadı.' })
+    }
+  }, [showToast])
+
+  const handleEditNote = useCallback((page) => {
+    setEditingNotePage(page)
+    setPageNoteDraft(page.page_notes || '')
+  }, [])
+
+  const handleSavePageNote = useCallback(async () => {
+    if (!editingNotePage) return
+    const result = await ipc.pagesUpdate(editingNotePage.id, { page_notes: pageNoteDraft })
+    if (result.success) {
+      loadPagesByBook(bookId)
+      showToast({ variant: 'success', title: 'Notlar kaydedildi', message: 'Sayfa notu güncellendi.' })
+      setEditingNotePage(null)
+      return
+    }
+    showToast({ variant: 'danger', title: 'Kayıt başarısız', message: result.error || 'Notlar kaydedilirken beklenmeyen bir hata oluştu.' })
+  }, [editingNotePage, pageNoteDraft, bookId, loadPagesByBook, showToast])
 
   const goBack = useCallback(() => navigate('/'), [navigate])
   const openEditForm = useCallback(() => setShowEditForm(true), [])
@@ -349,7 +469,18 @@ export default function BookDetail() {
           description="Eşleşen kayıt bulunamadı."
         />
       ) : (
-        <PageGrid pages={filteredPages} onSelect={handleSelectPage} onViewImage={setViewingImage} />
+        <PageGrid 
+          pages={filteredPages} 
+          onViewImage={setViewingImage} 
+          onUpload={handleUploadImage}
+          onDelete={confirmDeleteImage}
+          onRotate={handleRotateImage}
+          onTogglePdf={handleTogglePdf}
+          onReveal={handleRevealImage}
+          onEditNote={handleEditNote}
+          pdfItems={pdfItems}
+          virtuosoRef={virtuosoRef}
+        />
       )}
 
       {showEditForm && book ? (
@@ -362,6 +493,15 @@ export default function BookDetail() {
           message={`${book.name} ve ona bağlı tüm sayfalar silinecek. Devam etmek istiyor musun?`}
           onCancel={closeDeleteConfirm}
           onConfirm={handleDeleteBook}
+        />
+      ) : null}
+
+      {pageToDeleteImage ? (
+        <ConfirmDialog
+          title="Resmi Sil"
+          message="Bu sayfaya ait resim silinecek. Devam etmek istiyor musunuz?"
+          onCancel={() => setPageToDeleteImage(null)}
+          onConfirm={handleDeleteImage}
         />
       ) : null}
 
@@ -382,6 +522,14 @@ export default function BookDetail() {
       )}
 
       {bulkProgress && <ProgressModal progress={bulkProgress} />}
+
+      <NoteModal
+        page={editingNotePage}
+        draft={pageNoteDraft}
+        onChange={setPageNoteDraft}
+        onSave={handleSavePageNote}
+        onClose={() => setEditingNotePage(null)}
+      />
     </section>
   )
 }

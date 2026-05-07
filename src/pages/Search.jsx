@@ -118,40 +118,58 @@ const BookResultCard = memo(function BookResultCard({ item, query, onClick, stor
   )
 })
 
-const PageResultCard = memo(function PageResultCard({ item, query, onClick }) {
+const PageResultCard = memo(function PageResultCard({ item, query, onClick, storagePath }) {
+  const imageUrl = item.image ? toLocalAssetUrl(storagePath, item.image) : null
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="relative rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 text-left transition hover:border-[var(--accent)] hover:shadow-[var(--shadow-card)]"
+      className="relative flex min-h-[8rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] text-left transition hover:border-[var(--accent)] hover:shadow-[var(--shadow-card)]"
     >
-      <div className="absolute right-3 top-3">
+      <div className="absolute right-3 top-3 z-10">
         <ResultBadge type="page">Sayfa</ResultBadge>
       </div>
-      <div className="pr-16 text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)] line-clamp-1">
-        {item.book_name} / Sayfa {item.page_number}
+
+      <div className="h-auto w-24 shrink-0 overflow-hidden bg-[var(--bg-elevated)] sm:w-28 flex-col flex items-center justify-center relative">
+        {imageUrl ? (
+          <img src={imageUrl} alt={`Sayfa ${item.page_number}`} className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center opacity-60 px-2 text-center text-[var(--text-muted)]">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.1em]">Görsel Yok</span>
+          </div>
+        )}
       </div>
-      <div className="mt-2">
+
+      <div className="flex flex-1 flex-col gap-1.5 p-3 pr-16">
+        <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)] line-clamp-1">
+          {item.book_name} / Sayfa {item.page_number}
+        </div>
         <HighlightedText
           text={`${item.book_name} - Sayfa ${item.page_number}`}
           query={query}
           className="text-sm font-semibold text-[var(--text-primary)] line-clamp-1"
         />
-      </div>
-      <div className="mt-2 flex flex-col gap-1.5">
-        {item.match_sources?.map((source, index) => (
-          <div
-            key={index}
-            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2.5 py-1.5"
-          >
-            <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              {source.label}
+        <div className="mt-1 flex flex-col gap-1.5">
+          {item.match_sources?.map((source, index) => (
+            <div
+              key={index}
+              className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-2.5 py-1.5"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                {source.label}
+              </div>
+              <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-primary)] line-clamp-2">
+                <HighlightedText text={source.text} query={query} />
+              </div>
             </div>
-            <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-primary)] line-clamp-2">
-              <HighlightedText text={source.text} query={query} />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </button>
   )
@@ -172,7 +190,7 @@ export default function Search() {
   const ITEMS_PER_PAGE = 50
 
   const runSearch = useCallback(async (text, type, page) => {
-    if (text.trim().length < 2) {
+    if (text.trim().length === 0) {
       setResults([])
       setTotalResults(0)
       setTotalPages(0)
@@ -193,10 +211,31 @@ export default function Search() {
     (text) => {
       setQuery(text)
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => runSearch(text, searchType, 1), DEBOUNCE_MS)
+      
+      const trimmed = text.trim()
+      if (trimmed.length >= 2) {
+        debounceRef.current = setTimeout(() => runSearch(text, searchType, 1), DEBOUNCE_MS)
+      } else if (trimmed.length === 0) {
+        setResults([])
+        setTotalResults(0)
+        setTotalPages(0)
+      }
     },
     [runSearch, searchType]
   )
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter') {
+      const trimmed = query.trim()
+      if (searchType === 'page' && trimmed.length === 1) {
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        runSearch(query, searchType, 1)
+      } else if (trimmed.length >= 2) {
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        runSearch(query, searchType, 1)
+      }
+    }
+  }, [query, searchType, runSearch])
 
   const handleTypeChange = useCallback(
     (e) => {
@@ -227,7 +266,8 @@ export default function Search() {
     }
   }, [])
 
-  const isEmpty = query.trim().length < 2 || results.length === 0
+  const isValidLength = searchType === 'page' ? query.trim().length >= 1 : query.trim().length >= 2;
+  const isEmpty = results.length === 0;
 
   const getPlaceholder = () => {
     switch (searchType) {
@@ -259,6 +299,7 @@ export default function Search() {
           <SearchBar
             value={query}
             onChange={handleSearch}
+            onKeyDown={handleKeyDown}
             placeholder={getPlaceholder()}
           />
         </div>
@@ -276,10 +317,10 @@ export default function Search() {
 
       {isEmpty ? (
         <EmptyState
-          title={query.trim().length < 2 ? 'Arama yapmaya hazır' : 'Sonuç bulunamadı'}
+          title={!isValidLength ? 'Arama yapmaya hazır' : 'Sonuç bulunamadı'}
           description={
-            query.trim().length < 2
-              ? 'En az 2 karakter girerek aramayı başlatın.'
+            !isValidLength
+              ? (searchType === 'page' ? 'En az 1 karakter girip Enter\'a basarak aramayı başlatın.' : 'En az 2 karakter girerek aramayı başlatın.')
               : 'Arama kriterlerinizi değiştirin veya daha uzun bir ifade deneyin.'
           }
         />
@@ -300,7 +341,8 @@ export default function Search() {
                   key={item.id}
                   item={item}
                   query={query}
-                  onClick={() => navigate(`/books/${item.book_id}/pages/${item.page_id}`)}
+                  storagePath={storagePath}
+                  onClick={() => navigate(`/books/${item.book_id}?scrollTo=${item.page_id}`)}
                 />
               )
             )}
