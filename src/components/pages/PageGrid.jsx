@@ -21,6 +21,7 @@ export default function PageGrid({
   onReveal,
   onEditNote,
   pdfItems,
+  uploadingPageIds,
   virtuosoRef
 }) {
   return (
@@ -30,7 +31,8 @@ export default function PageGrid({
       data={pages}
       components={gridComponents}
       itemContent={(index, page) => {
-        const isPdfSelected = pdfItems.some(item => item.pageId === page.id);
+        const isPdfSelected = pdfItems.some(item => item.pageId === page.id)
+        const isUploading = uploadingPageIds?.has(page.id) ?? false;
         return (
           <PageCard 
             page={page} 
@@ -42,6 +44,7 @@ export default function PageGrid({
             onReveal={onReveal}
             onEditNote={onEditNote}
             isPdfSelected={isPdfSelected}
+            isUploading={isUploading}
           />
         )
       }}

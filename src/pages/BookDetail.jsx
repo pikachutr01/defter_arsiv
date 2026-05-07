@@ -121,6 +121,7 @@ export default function BookDetail() {
   const [editingNotePage, setEditingNotePage] = useState(null)
   const [pageNoteDraft, setPageNoteDraft] = useState('')
   const [pageToDeleteImage, setPageToDeleteImage] = useState(null)
+  const [uploadingPageIds, setUploadingPageIds] = useState(() => new Set())
 
   const { showToast } = useToast()
   
@@ -277,18 +278,28 @@ export default function BookDetail() {
   }, [togglePdfItem, book])
 
   const handleUploadImage = useCallback(async (pageId, sourcePath = null) => {
-    const result = sourcePath
-      ? await ipc.imagesUpload(pageId, sourcePath)
-      : await ipc.imagesUploadFromDialog(pageId)
-
-    if (result.success) {
-      loadPagesByBook(bookId)
-      showToast({ variant: 'success', title: 'Görsel güncellendi', message: 'Sayfa görseli başarıyla kaydedildi.' })
-      removePdfItem(pageId)
-      return
+    // Dialog akışında: önce sadece dosyayı seç, seçim tamamlandıktan sonra spinner başlat
+    let resolvedPath = sourcePath
+    if (!resolvedPath) {
+      const selectResult = await ipc.imagesSelectFromDialog()
+      if (!selectResult.success) return // iptal veya hata — spinner hiç başlamaz
+      resolvedPath = selectResult.filePath
     }
-    if (result.error === 'Seçim iptal edildi.') return
-    showToast({ variant: 'danger', title: 'Görsel yüklenemedi', message: result.error || 'Görsel seçilirken beklenmeyen bir sorun oluştu.' })
+
+    // Dosya yolu kesinleşti, şimdi spinner başlat
+    setUploadingPageIds((prev) => new Set(prev).add(pageId))
+    try {
+      const result = await ipc.imagesUpload(pageId, resolvedPath)
+      if (result.success) {
+        loadPagesByBook(bookId)
+        showToast({ variant: 'success', title: 'Görsel güncellendi', message: 'Sayfa görseli başarıyla kaydedildi.' })
+        removePdfItem(pageId)
+        return
+      }
+      showToast({ variant: 'danger', title: 'Görsel yüklenemedi', message: result.error || 'Görsel seçilirken beklenmeyen bir sorun oluştu.' })
+    } finally {
+      setUploadingPageIds((prev) => { const next = new Set(prev); next.delete(pageId); return next })
+    }
   }, [bookId, loadPagesByBook, showToast, removePdfItem])
 
   const handleDeleteImage = useCallback(async () => {
@@ -479,6 +490,7 @@ export default function BookDetail() {
           onReveal={handleRevealImage}
           onEditNote={handleEditNote}
           pdfItems={pdfItems}
+          uploadingPageIds={uploadingPageIds}
           virtuosoRef={virtuosoRef}
         />
       )}

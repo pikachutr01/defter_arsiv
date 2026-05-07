@@ -15,10 +15,10 @@ export default function BookCover({ coverPath, title }) {
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">
-          Kapak Yok
+          {title?.[0]?.toUpperCase() ?? '?'}
         </div>
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-[rgba(8,12,20,0.8)] via-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[rgba(8,12,20,0.75)] via-transparent" />
     </div>
   )
 }

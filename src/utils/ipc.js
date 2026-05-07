@@ -35,6 +35,7 @@ export const ipc = {
   imagesGetThumbnail: (imagePath) => getApi().images.getThumbnail(imagePath),
   imagesRotate: (pageId) => getApi().images.rotate(pageId),
   imagesBulkUpload: (bookId, sortMethod) => getApi().images.bulkUpload(bookId, sortMethod),
+  imagesSelectFromDialog: () => getApi().images.selectFromDialog(),
   onImagesBulkUploadProgress: (callback) => getApi().images.onBulkUploadProgress(callback),
   searchQuery: (payload) => getApi().search.query(payload),
   pdfGenerate: (payload) => getApi().pdf.generate(payload),

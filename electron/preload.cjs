@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('images:rotate', pageId),
     bulkUpload: (bookId, sortMethod) =>
       ipcRenderer.invoke('images:bulkUpload', bookId, sortMethod),
+    selectFromDialog: () =>
+      ipcRenderer.invoke('images:selectFromDialog'),
     onBulkUploadProgress: (callback) => {
       const listener = (_event, data) => callback(data)
       ipcRenderer.on('images:bulkUploadProgress', listener)

@@ -76,6 +76,7 @@ export default function PageCard({
   onReveal,
   onEditNote,
   isPdfSelected,
+  isUploading,
 }) {
   const isUploaded = page.is_uploaded === 1
   const storagePath = useSettingsStore((state) => state.storagePath)
@@ -99,8 +100,18 @@ export default function PageCard({
   return (
     <div
       style={appearance.style}
-      className={`relative flex h-[350px] w-full flex-col rounded-2xl border bg-[var(--bg-card)] transition ${appearance.className}`}
+      className={`relative flex h-[350px] w-full flex-col rounded-2xl border bg-[var(--bg-card)] transition ${isUploading ? 'pointer-events-none' : ''} ${appearance.className}`}
     >
+      {/* Upload progress overlay */}
+      {isUploading && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-[var(--bg-card)]/80 backdrop-blur-sm">
+          <svg className="animate-spin h-10 w-10 text-[var(--accent)]" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          <span className="mt-3 text-xs font-semibold text-[var(--text-muted)]">Yükleniyor...</span>
+        </div>
+      )}
       {/* Upper Area: Image Preview & Drag-Drop */}
       <div
         className="relative flex-1 bg-[var(--bg-elevated)] flex flex-col items-center justify-center overflow-hidden rounded-t-[calc(1rem-1px)]"

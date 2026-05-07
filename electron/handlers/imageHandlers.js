@@ -148,6 +148,21 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
     }
   })
 
+  ipcMain.handle('images:selectFromDialog', async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'] }],
+      })
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, error: 'Seçim iptal edildi.' }
+      }
+      return { success: true, filePath: result.filePaths[0] }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
   ipcMain.handle('images:delete', (_event, pageId) => {
     try {
       const storagePath = getStoragePath(db)
