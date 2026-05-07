@@ -9,39 +9,47 @@ import ConfirmDialog from '../components/shared/ConfirmDialog.jsx'
 import { useToast } from '../components/shared/ToastProvider.jsx'
 import usePdfQueueStore from '../store/usePdfQueueStore.js'
 
+// ─── Tooltip wrapper ──────────────────────────────────────────────────────────
+// Çocuk ögenin üstünde ortalanmış, yukarı açılan tooltip gösterir.
+// `group` class'ı parent'ta olmalı; bu bileşen kendi group'unu yönetir.
+
+function Tooltip({ label, children }) {
+  return (
+    <div className="group relative flex items-center justify-center">
+      {children}
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] opacity-0 shadow-[var(--shadow-soft)] transition-opacity duration-150 group-hover:opacity-100">
+        {label}
+        {/* Ok işareti */}
+        <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--border)]" />
+      </span>
+    </div>
+  )
+}
+
+// ─── Drag & drop hook ─────────────────────────────────────────────────────────
+
 function useDragDrop(onFileDrop) {
   const [isDragging, setIsDragging] = useState(false)
 
-  const handleDragOver = useCallback((event) => {
-    event.preventDefault()
-    setIsDragging(true)
-  }, [])
-
+  const handleDragOver = useCallback((e) => { e.preventDefault(); setIsDragging(true) }, [])
   const handleDragLeave = useCallback(() => setIsDragging(false), [])
-
-  const handleDrop = useCallback(
-    async (event) => {
-      event.preventDefault()
-      setIsDragging(false)
-      const droppedFile = event.dataTransfer.files?.[0]
-      if (!droppedFile) return
-      const filePath = ipc.systemGetPathForFile(droppedFile)
-      if (!filePath) return
-      await onFileDrop(filePath)
-    },
-    [onFileDrop]
-  )
+  const handleDrop = useCallback(async (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    const filePath = ipc.systemGetPathForFile(file)
+    if (!filePath) return
+    await onFileDrop(filePath)
+  }, [onFileDrop])
 
   return { isDragging, handleDragOver, handleDragLeave, handleDrop }
 }
 
+// ─── Görsel paneli ────────────────────────────────────────────────────────────
+
 const PageImagePanel = memo(function PageImagePanel({
-  imagePath,
-  updatedAt,
-  onOpenViewer,
-  onFileDrop,
-  onUpload,
-  storagePath,
+  imagePath, updatedAt, onOpenViewer, onFileDrop, onUpload, storagePath,
 }) {
   const timeParam = updatedAt ? new Date(updatedAt).getTime() : null
   const imageUrl = toLocalAssetUrl(storagePath, imagePath, timeParam)
@@ -53,8 +61,8 @@ const PageImagePanel = memo(function PageImagePanel({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`relative flex h-[350px] lg:h-[55vh] lg:max-h-[600px] w-full overflow-hidden rounded-2xl border transition ${isDragging
-        ? 'border-[var(--accent)] ring-4 ring-[rgba(79,142,247,0.15)]'
-        : 'border-[var(--border)]'
+          ? 'border-[var(--accent)] ring-4 ring-[rgba(79,142,247,0.15)]'
+          : 'border-[var(--border)]'
         } bg-[rgba(255,255,255,0.02)]`}
     >
       {imageUrl ? (
@@ -85,10 +93,13 @@ const PageImagePanel = memo(function PageImagePanel({
   )
 })
 
+// ─── Ana bileşen ──────────────────────────────────────────────────────────────
+
 export default function PageViewer() {
   const { pageId } = useParams()
   const navigate = useNavigate()
   const numericId = Number(pageId)
+
   const [page, setPage] = useState(null)
   const [notes, setNotes] = useState({ page: '' })
   const [isViewerOpen, setIsViewerOpen] = useState(false)
@@ -103,9 +114,7 @@ export default function PageViewer() {
 
   const syncPageState = useCallback((data) => {
     setPage(data)
-    setNotes({
-      page: data?.page_notes || '',
-    })
+    setNotes({ page: data?.page_notes || '' })
   }, [])
 
   const loadPage = useCallback(async () => {
@@ -116,103 +125,67 @@ export default function PageViewer() {
 
   useEffect(() => {
     if (!numericId) return
-    let isMounted = true
+    let mounted = true
     ipc.pagesGetById(numericId).then((result) => {
-      if (isMounted && result.success) syncPageState(result.data)
+      if (mounted && result.success) syncPageState(result.data)
     })
-    return () => {
-      isMounted = false
-    }
+    return () => { mounted = false }
   }, [numericId, syncPageState])
 
-  const isSelectedForPdf = useMemo(() => {
-    return pdfItems.some((item) => item.pageId === numericId)
-  }, [pdfItems, numericId])
-
-  const runImageUpload = useCallback(
-    async (sourcePath = null) => {
-      const result = sourcePath
-        ? await ipc.imagesUpload(numericId, sourcePath)
-        : await ipc.imagesUploadFromDialog(numericId)
-
-      if (result.success) {
-        await loadPage()
-        showToast({
-          variant: 'success',
-          title: 'Görsel güncellendi',
-          message: 'Sayfa görseli başarıyla kaydedildi.',
-        })
-        return
-      }
-      if (result.error === 'Seçim iptal edildi.') return
-      showToast({
-        variant: 'danger',
-        title: 'Görsel yüklenemedi',
-        message: result.error || 'Görsel seçilirken beklenmeyen bir sorun oluştu.',
-      })
-    },
-    [numericId, loadPage, showToast]
+  const isSelectedForPdf = useMemo(
+    () => pdfItems.some((item) => item.pageId === numericId),
+    [pdfItems, numericId]
   )
+
+  const runImageUpload = useCallback(async (sourcePath = null) => {
+    const result = sourcePath
+      ? await ipc.imagesUpload(numericId, sourcePath)
+      : await ipc.imagesUploadFromDialog(numericId)
+
+    if (result.success) {
+      await loadPage()
+      showToast({ variant: 'success', title: 'Görsel güncellendi', message: 'Sayfa görseli başarıyla kaydedildi.' })
+      return
+    }
+    if (result.error === 'Seçim iptal edildi.') return
+    showToast({ variant: 'danger', title: 'Görsel yüklenemedi', message: result.error || 'Görsel seçilirken beklenmeyen bir sorun oluştu.' })
+  }, [numericId, loadPage, showToast])
 
   const handleDeleteImage = useCallback(async () => {
     if (!isPendingDelete) return
     const result = await ipc.imagesDelete(numericId)
     setIsPendingDelete(false)
     if (result.success) {
-      if (isSelectedForPdf) {
-        removePdfItem(numericId)
-      }
+      if (isSelectedForPdf) removePdfItem(numericId)
       await loadPage()
-      showToast({
-        variant: 'success',
-        title: 'Görsel silindi',
-        message: 'Sayfa görseli kaldırıldı.',
-      })
+      showToast({ variant: 'success', title: 'Görsel silindi', message: 'Sayfa görseli kaldırıldı.' })
       return
     }
-    showToast({
-      variant: 'danger',
-      title: 'Görsel silinemedi',
-      message: result.error || 'Görsel silinirken beklenmeyen bir hata oluştu.',
-    })
+    showToast({ variant: 'danger', title: 'Görsel silinemedi', message: result.error || 'Görsel silinirken beklenmeyen bir hata oluştu.' })
   }, [isPendingDelete, numericId, loadPage, showToast, isSelectedForPdf, removePdfItem])
 
-  const handleRevealImage = useCallback(
-    async (imagePath) => {
-      if (!imagePath) return
-      const result = await ipc.imagesRevealInFolder(imagePath)
-      if (!result.success) {
-        showToast({
-          variant: 'danger',
-          title: 'Klasör açılamadı',
-          message: result.error || 'Görselin bulunduğu klasör açılamadı.',
-        })
-      }
-    },
-    [showToast]
-  )
+  const handleRevealImage = useCallback(async (imagePath) => {
+    if (!imagePath) return
+    const result = await ipc.imagesRevealInFolder(imagePath)
+    if (!result.success) {
+      showToast({ variant: 'danger', title: 'Klasör açılamadı', message: result.error || 'Görselin bulunduğu klasör açılamadı.' })
+    }
+  }, [showToast])
 
   const handleSaveNotes = useCallback(async () => {
     setIsSavingNotes(true)
-    const result = await ipc.pagesUpdate(numericId, {
-      page_notes: notes.page,
-    })
+    const result = await ipc.pagesUpdate(numericId, { page_notes: notes.page })
     setIsSavingNotes(false)
     if (result.success) {
       syncPageState(result.data)
       showToast({ variant: 'success', title: 'Notlar kaydedildi', message: 'Sayfa notu güncellendi.' })
       return
     }
-    showToast({
-      variant: 'danger',
-      title: 'Kayıt başarısız',
-      message: result.error || 'Notlar kaydedilirken beklenmeyen bir hata oluştu.',
-    })
+    showToast({ variant: 'danger', title: 'Kayıt başarısız', message: result.error || 'Notlar kaydedilirken beklenmeyen bir hata oluştu.' })
   }, [numericId, notes, syncPageState, showToast])
 
-  const handleNotesChangePage = useCallback((event) => setNotes({ page: event.target.value }), [])
+  const handleNotesChangePage = useCallback((e) => setNotes({ page: e.target.value }), [])
   const handleUpload = useCallback(() => runImageUpload(), [runImageUpload])
-
   const handleRotate = useCallback(async () => {
     const result = await ipc.imagesRotate(numericId)
     if (result.success) {
@@ -225,8 +198,11 @@ export default function PageViewer() {
 
   const handleDelete = useCallback(() => setIsPendingDelete(true), [])
   const handleOpenViewer = useCallback(() => setIsViewerOpen(true), [])
-  const handleReveal = useCallback(() => handleRevealImage(page?.image || null), [handleRevealImage, page])
+  const handleReveal = useCallback(() => handleRevealImage(page?.image ?? null), [handleRevealImage, page])
   const handleFileDrop = useCallback((filePath) => runImageUpload(filePath), [runImageUpload])
+  const closeViewer = useCallback(() => setIsViewerOpen(false), [])
+  const cancelDelete = useCallback(() => setIsPendingDelete(false), [])
+  const goBack = useCallback(() => navigate(`/books/${page ? page.book_id : ''}`), [navigate, page])
 
   const handleTogglePdf = useCallback(() => {
     if (!page?.image) return
@@ -239,35 +215,36 @@ export default function PageViewer() {
     })
   }, [togglePdfItem, numericId, page])
 
-  const closeViewer = useCallback(() => setIsViewerOpen(false), [])
-  const cancelDelete = useCallback(() => setIsPendingDelete(false), [])
-  const goBack = useCallback(() => navigate(`/books/${page ? page.book_id : ''}`), [navigate, page])
-
   return (
     <section className="flex flex-col h-full space-y-6">
-      {/* Header Alanı */}
+
+      {/* ── Başlık ── */}
       <div className="flex items-center gap-3">
         {page?.book_id && (
-          <button
-            type="button"
-            onClick={goBack}
-            className="group flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-            title="Kitaba Dön"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5 transition-transform group-hover:-translate-x-0.5" fill="none">
-              <path d="m15 6-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          <Tooltip label="Kitaba Dön">
+            <button
+              type="button"
+              onClick={goBack}
+              className="group flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5 transition-transform group-hover:-translate-x-0.5" fill="none">
+                <path d="m15 6-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </Tooltip>
         )}
         <h2 className="text-2xl font-medium tracking-tight">
-          Sayfa Görüntüle <span className="text-[var(--text-secondary)]">{page?.page_number ? `#${page.page_number}` : ''}</span>
+          Sayfa Görüntüle{' '}
+          <span className="text-[var(--text-secondary)]">
+            {page?.page_number ? `#${page.page_number}` : ''}
+          </span>
         </h2>
       </div>
 
-      {/* Ana Grid Düzeni */}
+      {/* ── Ana grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1">
 
-        {/* Sol Sütun: Görsel Önizleme (Geniş Alan) */}
+        {/* Sol: Görsel */}
         <div className="lg:col-span-8 flex flex-col">
           <PageImagePanel
             imagePath={page?.image}
@@ -279,58 +256,84 @@ export default function PageViewer() {
           />
         </div>
 
-        {/* Sağ Sütun: İşlemler ve Notlar */}
+        {/* Sağ: Araçlar + Notlar */}
         <div className="lg:col-span-4 flex flex-col gap-4 h-full">
 
-          {/* Araç Çubuğu (Toolbar) - Yalnızca resim varsa gösterilir */}
+          {/* Toolbar */}
           {page?.image && (
             <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-2">
-              <button
-                type="button"
-                onClick={handleTogglePdf}
-                title={isSelectedForPdf ? "PDF'den Çıkar" : "PDF'e Ekle"}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${isSelectedForPdf
-                  ? 'bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/20'
-                  : 'bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]'
-                  }`}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  {isSelectedForPdf ? (
-                    <line x1="9" y1="15" x2="15" y2="15"></line>
-                  ) : (
-                    <>
-                      <line x1="12" y1="12" x2="12" y2="18"></line>
-                      <line x1="9" y1="15" x2="15" y2="15"></line>
-                    </>
-                  )}
-                </svg>
-              </button>
 
-              <div className="mx-1 h-6 w-px bg-[var(--border)]"></div>
+              <Tooltip label={isSelectedForPdf ? "PDF'den Çıkar" : "PDF'e Ekle"}>
+                <button
+                  type="button"
+                  onClick={handleTogglePdf}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${isSelectedForPdf
+                      ? 'bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/20'
+                      : 'bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]'
+                    }`}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    {isSelectedForPdf ? (
+                      <line x1="9" y1="15" x2="15" y2="15" />
+                    ) : (
+                      <>
+                        <line x1="12" y1="12" x2="12" y2="18" />
+                        <line x1="9" y1="15" x2="15" y2="15" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+              </Tooltip>
 
-              <button type="button" onClick={handleUpload} title="Resmi Değiştir" className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-              </button>
+              <div className="mx-1 h-6 w-px bg-[var(--border)]" />
 
-              <button type="button" onClick={handleRotate} title="Sola Döndür" className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-              </button>
+              <Tooltip label="Resmi Değiştir">
+                <button type="button" onClick={handleUpload}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                </button>
+              </Tooltip>
 
-              <button type="button" onClick={handleReveal} title="Klasörde Bul" className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-              </button>
+              <Tooltip label="Sola Döndür">
+                <button type="button" onClick={handleRotate}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                </button>
+              </Tooltip>
 
-              <div className="flex-1"></div>
+              <Tooltip label="Klasörde Bul">
+                <button type="button" onClick={handleReveal}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                </button>
+              </Tooltip>
 
-              <button type="button" onClick={handleDelete} title="Resmi Sil" className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--danger-text)] transition hover:bg-[var(--danger-surface-soft)]">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              </button>
+              <div className="flex-1" />
+
+              <Tooltip label="Resmi Sil">
+                <button type="button" onClick={handleDelete}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--danger-text)] transition hover:bg-[var(--danger-surface-soft)]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
+              </Tooltip>
             </div>
           )}
 
-          {/* Notlar Paneli */}
+          {/* Notlar */}
           <div className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 h-fit">
             <div className="mb-3 flex items-center justify-between gap-4">
               <h3 className="text-base font-semibold">Sayfa Notu</h3>
@@ -351,7 +354,6 @@ export default function PageViewer() {
               className="w-full resize-y rounded-xl border border-[var(--border)] bg-transparent p-3 text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             />
           </div>
-
         </div>
       </div>
 

@@ -346,7 +346,7 @@ export default function BookDetail() {
       {filteredPages.length === 0 ? (
         <EmptyState
           title="Sayfa bulunamadı"
-          description="Bu ciltte henüz sayfa kaydı yok."
+          description="Eşleşen kayıt bulunamadı."
         />
       ) : (
         <PageGrid pages={filteredPages} onSelect={handleSelectPage} onViewImage={setViewingImage} />
