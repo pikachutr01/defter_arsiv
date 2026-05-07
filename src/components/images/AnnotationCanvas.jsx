@@ -4,7 +4,7 @@ import useSettingsStore from '../../store/useSettingsStore.js'
 import { toLocalAssetUrl } from '../../utils/paths.js'
 import { useImageZoom } from '../../hooks/useImageZoom.js'
 
-const TOOLS = { PEN: 'pen', ERASER: 'eraser' }
+const TOOLS = { PEN: 'pen', ERASER: 'eraser', RECTANGLE: 'rectangle', CIRCLE: 'circle' }
 const COLORS = ['#ff4444', '#ffcc00', '#44dd88', '#4f8ef7', '#ffffff', '#000000']
 const MAX_UNDO = 30
 
@@ -29,6 +29,7 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
   const canvasRef = useRef(null)
   const isDrawingRef = useRef(false)
   const undoStackRef = useRef([])
+  const shapeStartRef = useRef(null)
   // Blob URL'yi ref'te tut — temizleme için lazım
   const blobUrlRef = useRef(null)
   const [tool, setTool] = useState(TOOLS.PEN)
@@ -126,9 +127,14 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
     isDrawingRef.current = true
     const ctx = canvas.getContext('2d')
     const { x, y } = getPos(event)
-    ctx.beginPath()
-    ctx.moveTo(x, y)
-  }, [saveSnapshot, isLoading])
+    
+    if (tool === TOOLS.RECTANGLE || tool === TOOLS.CIRCLE) {
+      shapeStartRef.current = { x, y }
+    } else {
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+    }
+  }, [saveSnapshot, isLoading, tool])
 
   const draw = useCallback((event) => {
     event.preventDefault()
@@ -136,6 +142,38 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const { x, y } = getPos(event)
+
+    if (tool === TOOLS.RECTANGLE || tool === TOOLS.CIRCLE) {
+      // Şekil çizerken canlı önizleme için arka planı sürekli temizle (bir önceki snapshot'a dön)
+      const stack = undoStackRef.current
+      if (stack.length > 0) {
+        ctx.putImageData(stack[stack.length - 1], 0, 0)
+      }
+      
+      ctx.lineWidth = lineWidth
+      ctx.strokeStyle = color
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.globalCompositeOperation = 'source-over'
+      
+      const startX = shapeStartRef.current.x
+      const startY = shapeStartRef.current.y
+      
+      ctx.beginPath()
+      if (tool === TOOLS.RECTANGLE) {
+        ctx.rect(startX, startY, x - startX, y - startY)
+      } else if (tool === TOOLS.CIRCLE) {
+        const radiusX = Math.abs(x - startX) / 2
+        const radiusY = Math.abs(y - startY) / 2
+        const centerX = startX + (x - startX) / 2
+        const centerY = startY + (y - startY) / 2
+        ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI)
+      }
+      ctx.stroke()
+      setHasAnnotation(true)
+      return
+    }
+
     ctx.lineTo(x, y)
     ctx.lineWidth = tool === TOOLS.ERASER ? lineWidth * 6 : lineWidth
     ctx.lineCap = 'round'
@@ -211,6 +249,28 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
               }`}
           >
             ✏️ Kalem
+          </button>
+          <button
+            type="button"
+            onClick={() => setTool(TOOLS.RECTANGLE)}
+            title="Dikdörtgen"
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${tool === TOOLS.RECTANGLE
+              ? 'bg-[var(--accent)] text-white'
+              : 'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+          >
+            ⬜ Dikdörtgen
+          </button>
+          <button
+            type="button"
+            onClick={() => setTool(TOOLS.CIRCLE)}
+            title="Çember / Elips"
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${tool === TOOLS.CIRCLE
+              ? 'bg-[var(--accent)] text-white'
+              : 'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+          >
+            ⭕ Çember
           </button>
           <button
             type="button"
