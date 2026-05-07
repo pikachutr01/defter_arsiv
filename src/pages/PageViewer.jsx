@@ -346,7 +346,7 @@ export default function PageViewer() {
             <textarea
               value={notes.page}
               onChange={handleNotesChangePage}
-              rows={4}
+              rows={15}
               placeholder="Bu sayfa için alınacak notlar..."
               className="w-full resize-y rounded-xl border border-[var(--border)] bg-transparent p-3 text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             />
