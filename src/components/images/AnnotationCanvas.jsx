@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Modal from '../shared/Modal.jsx'
 import useSettingsStore from '../../store/useSettingsStore.js'
 import { toLocalAssetUrl } from '../../utils/paths.js'
+import { useImageZoom } from '../../hooks/useImageZoom.js'
 
 const TOOLS = { PEN: 'pen', ERASER: 'eraser' }
 const COLORS = ['#ff4444', '#ffcc00', '#44dd88', '#4f8ef7', '#ffffff', '#000000']
@@ -26,7 +27,6 @@ const loadImage = (src) =>
 export default function AnnotationCanvas({ item, onClose, onSave }) {
   const storagePath = useSettingsStore((state) => state.storagePath)
   const canvasRef = useRef(null)
-  const overlayRef = useRef(null)
   const isDrawingRef = useRef(false)
   const undoStackRef = useRef([])
   // Blob URL'yi ref'te tut — temizleme için lazım
@@ -37,6 +37,8 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
   const [hasAnnotation, setHasAnnotation] = useState(!!item.annotatedDataUrl)
   const [isLoading, setIsLoading] = useState(true)
   const [canUndo, setCanUndo] = useState(false)
+
+  const { containerRef, scale } = useImageZoom({ maxScale: 5, zoomSpeed: 0.15 })
 
   const imageUrl = toLocalAssetUrl(storagePath, item.imagePath)
 
@@ -58,12 +60,10 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
 
         const ctx = canvas.getContext('2d')
 
-        const maxW = 1400
-        const maxH = 1000
         let w = img.naturalWidth
         let h = img.naturalHeight
-        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW }
-        if (h > maxH) { w = Math.round(w * maxH / h); h = maxH }
+        
+        // Orijinal çözünürlüğü koru (maxW/maxH kısıtlamalarını kaldırdık)
         canvas.width = w
         canvas.height = h
 
@@ -185,7 +185,7 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
   const handleSave = () => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.98)
     onSave(dataUrl)
     onClose()
   }
@@ -284,9 +284,10 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
 
       {/* Canvas */}
       <div
-        ref={overlayRef}
+        ref={containerRef}
         className="relative overflow-auto rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)]"
         style={{ maxHeight: '65vh' }}
+        title="Ctrl + Fare Tekerleği ile yakınlaştır/uzaklaştır"
       >
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-[var(--text-muted)]">
@@ -305,7 +306,8 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
           style={{
             cursor: isLoading ? 'wait' : tool === TOOLS.ERASER ? 'cell' : 'crosshair',
             display: 'block',
-            maxWidth: '100%',
+            maxWidth: 'none',
+            width: `${scale * 100}%`,
             opacity: isLoading ? 0 : 1,
           }}
         />
