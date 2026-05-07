@@ -45,7 +45,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('images:rotate', pageId),
   },
   search: {
-    query: (text, bookId) => ipcRenderer.invoke('search:query', text, bookId),
+    query: (payload) => ipcRenderer.invoke('search:query', payload),
   },
   pdf: {
     generate: (payload) => ipcRenderer.invoke('pdf:generate', payload),
