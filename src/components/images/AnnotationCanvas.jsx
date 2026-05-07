@@ -62,7 +62,7 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
 
         let w = img.naturalWidth
         let h = img.naturalHeight
-        
+
         // Orijinal çözünürlüğü koru (maxW/maxH kısıtlamalarını kaldırdık)
         canvas.width = w
         canvas.height = h
@@ -206,8 +206,8 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
             onClick={() => setTool(TOOLS.PEN)}
             title="Kalem"
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${tool === TOOLS.PEN
-                ? 'bg-[var(--accent)] text-white'
-                : 'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              ? 'bg-[var(--accent)] text-white'
+              : 'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
           >
             ✏️ Kalem
@@ -217,8 +217,8 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
             onClick={() => setTool(TOOLS.ERASER)}
             title="Silgi"
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${tool === TOOLS.ERASER
-                ? 'bg-[var(--accent)] text-white'
-                : 'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              ? 'bg-[var(--accent)] text-white'
+              : 'border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
           >
             🧹 Silgi
@@ -234,8 +234,8 @@ export default function AnnotationCanvas({ item, onClose, onSave }) {
               onClick={() => { setColor(c); setTool(TOOLS.PEN) }}
               style={{ backgroundColor: c }}
               className={`h-6 w-6 rounded-full border-2 transition ${color === c && tool === TOOLS.PEN
-                  ? 'border-[var(--accent)] scale-125'
-                  : 'border-[var(--border)]'
+                ? 'border-[var(--accent)] scale-125'
+                : 'border-[var(--border)]'
                 }`}
             />
           ))}

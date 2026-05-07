@@ -77,7 +77,7 @@ export default function Help() {
             <p>Fiziksel bir defterin sayfasını simüle eden bu ekranda seçili sayfa üzerinde işlem yaparsınız.</p>
             <ul className="list-inside list-disc space-y-2 ml-2">
               <li><strong>Fotoğraf Yükleme:</strong> Sürükle & Bırak yaparak veya butona tıklayarak o sayfa için fotoğraf yükleyebilirsiniz. Yüklenen fotoğraflar sistem tarafından optimize edilir.</li>
-              <li><strong>Görsel İşlemleri:</strong> Yüklenen fotoğrafı 90 derece sola döndürebilir (Rotasyon), silebilir veya büyüterek inceleyebilirsiniz.</li>
+              <li><strong>Görsel İşlemleri:</strong> Yüklenen fotoğrafı 90 derece sola döndürebilir (Rotasyon), silebilir veya büyüterek inceleyebilirsiniz. Resmi büyüttüğünüzde (ön izleme modunda) <strong>Ctrl + Fare Tekerleği</strong> ile resmi fare imlecinizin bulunduğu yere doğru yakınlaştırıp uzaklaştırabilir, farenizin sol tuşuna basılı tutarak resmi dilediğiniz yöne <strong>sürükleyip (pan)</strong> rahatça inceleyebilirsiniz.</li>
               <li><strong>Sayfa Notları:</strong> Sayfaya özel notlar düşebilirsiniz. Notu yazdıktan sonra mutlaka "Notu Kaydet" butonuna basmalısınız.</li>
               <li><strong>PDF Sırasına Ekleme:</strong> Sayfadaki önemli bir veriyi dışa aktarmak istiyorsanız görselin köşesindeki "PDF Sırasına Ekle / Çıkar" butonuyla belgeyi dışa aktarma sepetinize gönderebilirsiniz.</li>
               <li><strong>Hızlı Gezinme:</strong> "Önceki Sayfa" ve "Sonraki Sayfa" butonlarını kullanarak veya klavyenizin sağ/sol yön tuşlarıyla sayfalar arasında sayfadan çıkmadan seri şekilde geçiş yapabilirsiniz.</li>
@@ -115,6 +115,7 @@ export default function Help() {
             <p>Seçtiğiniz sayfaları birleştirerek tek bir PDF dokümanı elde etmenizi sağlar.</p>
             <ul className="list-inside list-disc space-y-2 ml-2">
               <li><strong>Kuyruk Yönetimi:</strong> Sayfa Görüntüleme ekranında "PDF Sırasına Ekle" dediğiniz tüm görseller burada listelenir. Çıktıda görünmesini istemediklerinizi listeden silebilirsiniz veya "Tümünü Temizle" diyebilirsiniz.</li>
+              <li><strong>Çizim Düzenleyicisi:</strong> Kuyruğa eklediğiniz resimlerin üzerine not yazmak veya belirli alanları vurgulamak/kapatmak için kartın üzerindeki kalem ikonuna (✏️) tıklayabilirsiniz. Çizim ekranında daha hassas çalışabilmek için <strong>Ctrl + Fare Tekerleği</strong> kombinasyonuyla imlecin bulunduğu noktaya <strong>yakınlaştırma (zoom)</strong> yapabilirsiniz. İşlemler orijinal çözünürlük üzerinden kayıpsız (%98) kaliteyle kaydedilir.</li>
               <li><strong>PDF Çıktısı Alma:</strong> Liste hazır olduğunda "PDF Oluştur" diyerek dokümanı bilgisayarınızda istediğiniz klasöre kaydedebilirsiniz. Görüntüler A4 boyutunda dikey olarak sayfaya hizalanır.</li>
             </ul>
           </div>
