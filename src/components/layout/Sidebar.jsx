@@ -152,7 +152,7 @@ export default function Sidebar() {
               key={item.to}
               to={item.to}
               end={item.to === '/'}
-              title={isSidebarCollapsed ? item.label : undefined}
+              title={undefined}
               className={({ isActive }) =>
                 `group relative flex items-center rounded-xl transition-all duration-150 ${isSidebarCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-2.5'
                 } ${isActive
@@ -182,7 +182,7 @@ export default function Sidebar() {
 
               {/* Collapsed modda hover tooltip */}
               {isSidebarCollapsed && (
-                <span className="pointer-events-none absolute left-full z-50 ml-3 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] opacity-0 shadow-[var(--shadow-soft)] transition-opacity duration-150 group-hover:opacity-100">
+                <span className="pointer-events-none absolute left-full z-[99999] ml-3 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] opacity-0 shadow-[var(--shadow-soft)] transition-opacity duration-150 group-hover:opacity-100">
                   {item.label}
                   {badgeCount > 0 && (
                     <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${item.badgeType === 'danger' ? 'bg-[var(--danger)] text-white' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'

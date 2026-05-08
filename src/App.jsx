@@ -6,6 +6,7 @@ import Sidebar from './components/layout/Sidebar.jsx'
 import TopBar from './components/layout/TopBar.jsx'
 import DeveloperResetGateway from './components/layout/DeveloperResetGateway.jsx'
 import DeveloperDataManagerGateway from './components/layout/DeveloperDataManagerGateway.jsx'
+import ScrollToTop from './components/shared/ScrollToTop.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Login from './pages/Login.jsx'
 import BookDetail from './pages/BookDetail.jsx'
@@ -50,6 +51,7 @@ function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <ScrollToTop />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { ipc } from '../../utils/ipc.js'
 import { toLocalAssetUrl } from '../../utils/paths.js'
 import useSettingsStore from '../../store/useSettingsStore.js'
@@ -77,9 +77,17 @@ export default function PageCard({
   onEditNote,
   isPdfSelected,
   isUploading,
+  isHighlighted,
+  onHighlightEnd,
 }) {
   const isUploaded = page.is_uploaded === 1
   const storagePath = useSettingsStore((state) => state.storagePath)
+
+  useEffect(() => {
+    if (!isHighlighted) return
+    const t = setTimeout(() => onHighlightEnd?.(), 1200)
+    return () => clearTimeout(t)
+  }, [isHighlighted, onHighlightEnd])
 
   const note = useMemo(() => String(page.page_notes ?? '').trim(), [page.page_notes])
 
@@ -100,7 +108,7 @@ export default function PageCard({
   return (
     <div
       style={appearance.style}
-      className={`relative flex h-[350px] w-full flex-col rounded-2xl border bg-[var(--bg-card)] transition ${isUploading ? 'pointer-events-none' : ''} ${appearance.className}`}
+      className={`relative flex h-[350px] w-full flex-col rounded-2xl border bg-[var(--bg-card)] transition ${isUploading ? 'pointer-events-none' : ''} ${appearance.className} ${isHighlighted ? 'animate-[highlightBurst_1.1s_ease-out_forwards]' : ''}`}
     >
       {/* Upload progress overlay */}
       {isUploading && (

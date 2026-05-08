@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom'
 import useBookStore from '../store/useBookStore.js'
 import usePageStore from '../store/usePageStore.js'
 import usePdfQueueStore from '../store/usePdfQueueStore.js'
+import useUiStore from '../store/useUiStore.js'
 import PageGrid from '../components/pages/PageGrid.jsx'
 import EmptyState from '../components/shared/EmptyState.jsx'
 import { ipc } from '../utils/ipc.js'
@@ -98,8 +99,13 @@ export default function BookDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const bookId = Number(id)
   const virtuosoRef = useRef(null)
+
+  // Arama sayfasından gelindi mi?
+  const fromSearch = location.state?.fromSearch ?? false
+  const searchReturnState = fromSearch ? location.state : null
 
   const books = useBookStore((state) => state.books)
   const updateBook = useBookStore((state) => state.updateBook)
@@ -120,6 +126,7 @@ export default function BookDetail() {
   const [pageNoteDraft, setPageNoteDraft] = useState('')
   const [pageToDeleteImage, setPageToDeleteImage] = useState(null)
   const [uploadingPageIds, setUploadingPageIds] = useState(() => new Set())
+  const [highlightedPageId, setHighlightedPageId] = useState(null)
 
   const { showToast } = useToast()
 
@@ -181,13 +188,18 @@ export default function BookDetail() {
       const index = filteredPages.findIndex((p) => p.id === Number(scrollToPageId))
       if (index !== -1) {
         setTimeout(() => {
-          virtuosoRef.current?.scrollToIndex({ index, align: 'center', behavior: 'smooth' })
+          // 'auto' ile anlık atlama yap — smooth scroll VirtuosoGrid'in
+          // kartı render etmesinden önce biter ve animasyon kaçırılır
+          virtuosoRef.current?.scrollToIndex({ index, align: 'center', behavior: 'auto' })
+          // Kart render edildikten kısa süre sonra animasyonu tetikle
+          setTimeout(() => setHighlightedPageId(Number(scrollToPageId)), 150)
         }, 100)
       }
+      // location.state'i koru — akı setSearchParams state'i siler
       searchParams.delete('scrollTo')
-      setSearchParams(searchParams, { replace: true })
+      setSearchParams(searchParams, { replace: true, state: location.state })
     }
-  }, [scrollToPageId, filteredPages, searchParams, setSearchParams])
+  }, [scrollToPageId, filteredPages, searchParams, setSearchParams, location.state])
 
 
 
@@ -323,7 +335,33 @@ export default function BookDetail() {
     showToast({ variant: 'danger', title: 'Kayıt başarısız', message: result.error || 'Notlar kaydedilirken beklenmeyen bir hata oluştu.' })
   }, [editingNotePage, pageNoteDraft, bookId, loadPagesByBook, showToast])
 
-  const goBack = useCallback(() => navigate('/'), [navigate])
+  const goBack = useCallback(() => {
+    if (fromSearch && searchReturnState) {
+      navigate('/search', {
+        state: {
+          restoreQuery: searchReturnState.query,
+          restoreType: searchReturnState.searchType,
+          restorePage: searchReturnState.page,
+        },
+      })
+    } else {
+      navigate('/')
+    }
+  }, [navigate, fromSearch, searchReturnState])
+
+  const setHeaderBackNav = useUiStore((state) => state.setHeaderBackNav)
+  const clearHeaderBackNav = useUiStore((state) => state.clearHeaderBackNav)
+
+  // TopBar'a back nav bilgisini gönder, unmount'ta temizle
+  useEffect(() => {
+    setHeaderBackNav({
+      label: fromSearch ? 'Aramaya Dön' : 'Geri',
+      action: goBack,
+      bookName: book?.name || '',
+      isFromSearch: fromSearch,
+    })
+    return () => clearHeaderBackNav()
+  }, [fromSearch, goBack, book?.name, setHeaderBackNav, clearHeaderBackNav])
   const openEditForm = useCallback(() => setShowEditForm(true), [])
   const closeEditForm = useCallback(() => setShowEditForm(false), [])
   const openDeleteConfirm = useCallback(() => setShowDeleteConfirm(true), [])
@@ -359,25 +397,7 @@ export default function BookDetail() {
     <section className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={goBack}
-              className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] p-2 text-[var(--text-primary)] transition hover:border-[var(--accent)]"
-              title="Geri"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
-                <path
-                  d="m15 6-6 6 6 6"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <h2 className="text-2xl">{book?.name || 'Cilt'}</h2>
-          </div>
+          <h2 className="text-2xl">{book?.name || 'Cilt'}</h2>
           <p className="text-sm text-[var(--text-muted)]">
             Sayfaları düzenle ve fotoğrafları yükle.
           </p>
@@ -446,6 +466,8 @@ export default function BookDetail() {
           pdfItems={pdfItems}
           uploadingPageIds={uploadingPageIds}
           virtuosoRef={virtuosoRef}
+          highlightedPageId={highlightedPageId}
+          onHighlightEnd={() => setHighlightedPageId(null)}
         />
       )}
 

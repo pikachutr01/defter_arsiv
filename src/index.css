@@ -161,3 +161,22 @@ button:disabled {
     box-shadow: 0 0 0 rgba(79, 142, 247, 0.1);
   }
 }
+
+@keyframes highlightBurst {
+  0% {
+    box-shadow: 0 0 0 0 rgba(224, 82, 82, 0.9);
+    border-color: var(--danger);
+  }
+  40% {
+    box-shadow: 0 0 0 10px rgba(224, 82, 82, 0.35);
+    border-color: var(--danger);
+  }
+  75% {
+    box-shadow: 0 0 0 20px rgba(224, 82, 82, 0.08);
+    border-color: var(--danger);
+  }
+  100% {
+    box-shadow: 0 0 0 28px rgba(224, 82, 82, 0);
+    border-color: var(--danger);
+  }
+}

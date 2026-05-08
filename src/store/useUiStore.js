@@ -15,6 +15,12 @@ const useUiStore = create((set) => ({
       if (canUseStorage) window.localStorage.setItem(SIDEBAR_KEY, String(next))
       return { isSidebarCollapsed: next }
     }),
+
+  // TopBar back navigation — BookDetail tarafından set edilir
+  // { label: string, action: fn, bookName: string } | null
+  headerBackNav: null,
+  setHeaderBackNav: (nav) => set({ headerBackNav: nav }),
+  clearHeaderBackNav: () => set({ headerBackNav: null }),
 }))
 
 export default useUiStore

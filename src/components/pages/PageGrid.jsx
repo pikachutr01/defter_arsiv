@@ -22,7 +22,9 @@ export default function PageGrid({
   onEditNote,
   pdfItems,
   uploadingPageIds,
-  virtuosoRef
+  virtuosoRef,
+  highlightedPageId,
+  onHighlightEnd,
 }) {
   return (
     <VirtuosoGrid
@@ -45,6 +47,8 @@ export default function PageGrid({
             onEditNote={onEditNote}
             isPdfSelected={isPdfSelected}
             isUploading={isUploading}
+            isHighlighted={highlightedPageId === page.id}
+            onHighlightEnd={onHighlightEnd}
           />
         )
       }}

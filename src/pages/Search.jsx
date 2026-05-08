@@ -1,10 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ipc } from '../utils/ipc.js'
 import SearchBar from '../components/shared/SearchBar.jsx'
 import EmptyState from '../components/shared/EmptyState.jsx'
 import useSettingsStore from '../store/useSettingsStore.js'
 import { toLocalAssetUrl } from '../utils/paths.js'
+import ImageViewer from '../components/images/ImageViewer.jsx'
 
 const DEBOUNCE_MS = 300
 
@@ -57,7 +58,6 @@ const ResultBadge = memo(function ResultBadge({ type, children }) {
 const BookResultCard = memo(function BookResultCard({ item, query, onClick, storagePath }) {
   const coverUrl = item.cover_image ? toLocalAssetUrl(storagePath, item.cover_image) : null
 
-  // İki ayrı .find() yerine tek geçişte türet
   const { descriptionSource, noteSource } = useMemo(() => {
     let desc = null
     let note = null
@@ -118,24 +118,36 @@ const BookResultCard = memo(function BookResultCard({ item, query, onClick, stor
   )
 })
 
-const PageResultCard = memo(function PageResultCard({ item, query, onClick, storagePath }) {
+const PageResultCard = memo(function PageResultCard({ item, query, onClick, onPreview, storagePath }) {
   const imageUrl = item.image ? toLocalAssetUrl(storagePath, item.image) : null
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative flex min-h-[8rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] text-left transition hover:border-[var(--accent)] hover:shadow-[var(--shadow-card)]"
-    >
+    <div className="relative flex min-h-[8rem] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] transition hover:border-[var(--accent)] hover:shadow-[var(--shadow-card)]">
       <div className="absolute right-3 top-3 z-10">
         <ResultBadge type="page">Sayfa</ResultBadge>
       </div>
 
-      <div className="h-auto w-24 shrink-0 overflow-hidden bg-[var(--bg-elevated)] sm:w-28 flex-col flex items-center justify-center relative">
+      {/* Resim alanı — göz önizleme overlay */}
+      <div className="group relative flex h-auto w-24 shrink-0 flex-col items-center justify-center overflow-hidden bg-[var(--bg-elevated)] sm:w-28">
         {imageUrl ? (
-          <img src={imageUrl} alt={`Sayfa ${item.page_number}`} className="absolute inset-0 h-full w-full object-cover" />
+          <>
+            <img src={imageUrl} alt={`Sayfa ${item.page_number}`} className="absolute inset-0 h-full w-full object-cover" />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onPreview?.(item) }}
+              className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-200 group-hover:bg-black/50 group-hover:opacity-100"
+              title="Önizle"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm ring-1 ring-white/30 transition-transform duration-200 group-hover:scale-110">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </span>
+            </button>
+          </>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center opacity-60 px-2 text-center text-[var(--text-muted)]">
+          <div className="flex h-full flex-col items-center justify-center px-2 text-center text-[var(--text-muted)] opacity-60">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
               <circle cx="8.5" cy="8.5" r="1.5" />
@@ -146,7 +158,12 @@ const PageResultCard = memo(function PageResultCard({ item, query, onClick, stor
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 p-3 pr-16">
+      {/* İçerik — tıklanınca sayfaya git */}
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex flex-1 flex-col gap-1.5 p-3 pr-16 text-left"
+      >
         <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)] line-clamp-1">
           {item.book_name} / Sayfa {item.page_number}
         </div>
@@ -170,22 +187,25 @@ const PageResultCard = memo(function PageResultCard({ item, query, onClick, stor
             </div>
           ))}
         </div>
-      </div>
-    </button>
+      </button>
+    </div>
   )
 })
 
 export default function Search() {
   const [query, setQuery] = useState('')
-  const [searchType, setSearchType] = useState('all') // 'all', 'book', 'page', 'note'
+  const [searchType, setSearchType] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [results, setResults] = useState([])
   const [totalResults, setTotalResults] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [isSearching, setIsSearching] = useState(false)
+  const [previewItem, setPreviewItem] = useState(null)
   const navigate = useNavigate()
+  const location = useLocation()
   const storagePath = useSettingsStore((state) => state.storagePath)
   const debounceRef = useRef(null)
+  const restoredRef = useRef(false)
 
   const ITEMS_PER_PAGE = 50
 
@@ -207,11 +227,25 @@ export default function Search() {
     }
   }, [])
 
+  // "Aramaya Dön" ile geri dönüldüğünde sorgu + sayfa restore
+  useEffect(() => {
+    if (restoredRef.current) return
+    const state = location.state
+    if (state?.restoreQuery) {
+      restoredRef.current = true
+      const { restoreQuery, restoreType, restorePage } = state
+      setQuery(restoreQuery)
+      if (restoreType) setSearchType(restoreType)
+      runSearch(restoreQuery, restoreType || 'all', restorePage || 1)
+      // State'i temizle (F5'te tekrar restore olmasın)
+      window.history.replaceState({}, '')
+    }
+  }, [location.state, runSearch])
+
   const handleSearch = useCallback(
     (text) => {
       setQuery(text)
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      
       const trimmed = text.trim()
       if (trimmed.length >= 2) {
         debounceRef.current = setTimeout(() => runSearch(text, searchType, 1), DEBOUNCE_MS)
@@ -259,15 +293,26 @@ export default function Search() {
     [query, searchType, totalPages, runSearch]
   )
 
-  // Unmount'ta bekleyen timer'ı temizle
+  const navigateToBook = useCallback((bookId) => {
+    navigate(`/books/${bookId}`, {
+      state: { fromSearch: true, query, searchType, page: currentPage },
+    })
+  }, [navigate, query, searchType, currentPage])
+
+  const navigateToPage = useCallback((bookId, pageId) => {
+    navigate(`/books/${bookId}?scrollTo=${pageId}`, {
+      state: { fromSearch: true, query, searchType, page: currentPage },
+    })
+  }, [navigate, query, searchType, currentPage])
+
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [])
 
-  const isValidLength = searchType === 'page' ? query.trim().length >= 1 : query.trim().length >= 2;
-  const isEmpty = results.length === 0;
+  const isValidLength = searchType === 'page' ? query.trim().length >= 1 : query.trim().length >= 2
+  const isEmpty = results.length === 0
 
   const getPlaceholder = () => {
     switch (searchType) {
@@ -320,7 +365,7 @@ export default function Search() {
           title={!isValidLength ? 'Arama yapmaya hazır' : 'Sonuç bulunamadı'}
           description={
             !isValidLength
-              ? (searchType === 'page' ? 'En az 1 karakter girip Enter\'a basarak aramayı başlatın.' : 'En az 2 karakter girerek aramayı başlatın.')
+              ? (searchType === 'page' ? "En az 1 karakter girip Enter'a basarak aramayı başlatın." : 'En az 2 karakter girerek aramayı başlatın.')
               : 'Arama kriterlerinizi değiştirin veya daha uzun bir ifade deneyin.'
           }
         />
@@ -334,7 +379,7 @@ export default function Search() {
                   item={item}
                   query={query}
                   storagePath={storagePath}
-                  onClick={() => navigate(`/books/${item.book_id}`)}
+                  onClick={() => navigateToBook(item.book_id)}
                 />
               ) : (
                 <PageResultCard
@@ -342,7 +387,8 @@ export default function Search() {
                   item={item}
                   query={query}
                   storagePath={storagePath}
-                  onClick={() => navigate(`/books/${item.book_id}?scrollTo=${item.page_id}`)}
+                  onClick={() => navigateToPage(item.book_id, item.page_id)}
+                  onPreview={() => setPreviewItem(item)}
                 />
               )
             )}
@@ -372,6 +418,14 @@ export default function Search() {
             </div>
           )}
         </div>
+      )}
+
+      {previewItem && (
+        <ImageViewer
+          title={`${previewItem.book_name} — Sayfa ${previewItem.page_number}`}
+          imagePath={previewItem.image}
+          onClose={() => setPreviewItem(null)}
+        />
       )}
     </section>
   )

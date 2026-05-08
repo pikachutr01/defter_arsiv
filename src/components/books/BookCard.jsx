@@ -9,7 +9,7 @@ export default function BookCard({ book, onSelect, onEdit, onDelete, className =
     : '-'
 
   return (
-    <div className={`group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:border-[var(--accent)] ${className}`}>
+    <div className={`group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-[var(--shadow-card)] transition hover:border-[var(--accent)] hover:shadow-[0_8px_32px_rgba(79,142,247,0.15)] ${className}`}>
       <button type="button" onClick={() => onSelect(book)} className="text-left">
         <BookCover coverPath={book.cover_image} title={book.name} />
       </button>
