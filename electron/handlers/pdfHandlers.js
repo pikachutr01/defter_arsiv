@@ -144,7 +144,7 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
       const finalFileName = path.basename(finalPdfPath)
 
       // PDFKit dokümanını hazırla
-      const doc = new PDFDocument({ autoFirstPage: false, margin: 20 })
+      const doc = new PDFDocument({ autoFirstPage: false, margin: 15 })
 
       const pdfFontPath = resolvePdfFontPath()
       if (pdfFontPath) {
@@ -155,7 +155,7 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
       const writeStream = fs.createWriteStream(finalPdfPath, { encoding: null })
       doc.pipe(writeStream)
 
-      const MARGIN = 20
+      const MARGIN = 15
 
       for (let i = 0; i < selections.length; i++) {
         // Her 50 sayfada bir olay döngüsüne nefes aldır (GC & UI yanıt verme)

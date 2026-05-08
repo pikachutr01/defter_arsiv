@@ -40,17 +40,15 @@ function AppLayout() {
   }, [fetchStoragePath, navigate])
 
   return (
-    <div className="min-h-screen text-[var(--text-primary)]">
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="flex-1">
-          <TopBar />
-          <DeveloperResetGateway />
-          <DeveloperDataManagerGateway />
-          <main className="px-8 pb-12 pt-6">
-            <Outlet />
-          </main>
-        </div>
+    <div className="flex min-w-0 text-[var(--text-primary)]">
+      <Sidebar />
+      <div className="flex min-h-screen flex-1 flex-col">
+        <TopBar />
+        <DeveloperResetGateway />
+        <DeveloperDataManagerGateway />
+        <main className="px-8 pb-12 pt-6">
+          <Outlet />
+        </main>
       </div>
     </div>
   )

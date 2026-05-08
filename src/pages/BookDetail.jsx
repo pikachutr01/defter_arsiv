@@ -109,22 +109,20 @@ export default function BookDetail() {
 
   const [filter, setFilter] = useState('all')
   const [fetchedBook, setFetchedBook] = useState(null)
-  // null → taslak yok, string → kullanıcı düzenleme yaptı
-  const [bookNotesDraft, setBookNotesDraft] = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [viewingImage, setViewingImage] = useState(null)
 
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkProgress, setBulkProgress] = useState(null)
-  
+
   const [editingNotePage, setEditingNotePage] = useState(null)
   const [pageNoteDraft, setPageNoteDraft] = useState('')
   const [pageToDeleteImage, setPageToDeleteImage] = useState(null)
   const [uploadingPageIds, setUploadingPageIds] = useState(() => new Set())
 
   const { showToast } = useToast()
-  
+
   const pdfItems = usePdfQueueStore((state) => state.items)
   const togglePdfItem = usePdfQueueStore((state) => state.toggleItem)
   const removePdfItem = usePdfQueueStore((state) => state.removeItem)
@@ -144,7 +142,6 @@ export default function BookDetail() {
     [bookId, cachedBook, fetchedBook]
   )
 
-  const bookNotes = bookNotesDraft ?? book?.book_notes ?? ''
 
   useEffect(() => {
     if (bookId) loadPagesByBook(bookId)
@@ -192,40 +189,14 @@ export default function BookDetail() {
     }
   }, [scrollToPageId, filteredPages, searchParams, setSearchParams])
 
-  const handleSaveNotes = useCallback(async () => {
-    if (!book) return
-    const payload = {
-      name: book.name,
-      description: book.description,
-      total_pages: book.total_pages,
-      book_notes: bookNotes,
-      cover_source_path: null,
-      remove_cover: false,
-    }
-    const result = await updateBook(bookId, payload)
-    if (result?.success) {
-      setFetchedBook(result.data)
-      setBookNotesDraft(null)
-      showToast({
-        variant: 'success',
-        title: 'Notlar kaydedildi',
-        message: 'Cilt notu başarıyla güncellendi.',
-      })
-      return
-    }
-    showToast({
-      variant: 'danger',
-      title: 'Kayıt başarısız',
-      message: result?.error || 'Cilt notu kaydedilemedi.',
-    })
-  }, [book, bookId, bookNotes, updateBook, showToast])
+
+
 
   const handleUpdateBook = useCallback(async (payload) => {
     const result = await updateBook(bookId, payload)
     if (result.success) {
       setFetchedBook(result.data)
       setShowEditForm(false)
-      setBookNotesDraft(null)
       loadPagesByBook(bookId)
       showToast({
         variant: 'success',
@@ -238,6 +209,7 @@ export default function BookDetail() {
       variant: 'danger',
       title: 'Güncelleme başarısız',
       message: result.error || 'Cilt bilgileri güncellenemedi.',
+      duration: 6000,
     })
   }, [bookId, updateBook, showToast])
 
@@ -261,10 +233,6 @@ export default function BookDetail() {
       message: result.error || 'Cilt silinirken beklenmeyen bir hata oluştu.',
     })
   }, [book, bookId, deleteBook, navigate, showToast])
-
-  const handleNotesChange = useCallback((event) => {
-    setBookNotesDraft(event.target.value)
-  }, [])
 
   const handleTogglePdf = useCallback((page) => {
     if (!page?.image) return
@@ -304,7 +272,7 @@ export default function BookDetail() {
 
   const handleDeleteImage = useCallback(async () => {
     if (!pageToDeleteImage) return;
-    
+
     const result = await ipc.imagesDelete(pageToDeleteImage)
     if (result.success) {
       removePdfItem(pageToDeleteImage)
@@ -453,26 +421,12 @@ export default function BookDetail() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
-        <div className="flex items-center justify-between gap-4">
-          <h3 className="text-lg">Cilt Notu</h3>
-          <button
-            type="button"
-            onClick={handleSaveNotes}
-            disabled={bookNotesDraft === null}
-            className="rounded-lg bg-[var(--accent)] px-3 py-2 text-xs text-white transition disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Notu Kaydet
-          </button>
+      {book?.book_notes ? (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-3">
+          <p className="text-xs text-[var(--text-muted)] mb-1">Cilt Notu</p>
+          <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap">{book.book_notes}</p>
         </div>
-        <textarea
-          value={bookNotes}
-          onChange={handleNotesChange}
-          rows={4}
-          placeholder="Cilde özel not"
-          className="mt-3 w-full rounded-xl border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text-primary)]"
-        />
-      </div>
+      ) : null}
 
       {filteredPages.length === 0 ? (
         <EmptyState
@@ -480,9 +434,9 @@ export default function BookDetail() {
           description="Eşleşen kayıt bulunamadı."
         />
       ) : (
-        <PageGrid 
-          pages={filteredPages} 
-          onViewImage={setViewingImage} 
+        <PageGrid
+          pages={filteredPages}
+          onViewImage={setViewingImage}
           onUpload={handleUploadImage}
           onDelete={confirmDeleteImage}
           onRotate={handleRotateImage}

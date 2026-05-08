@@ -59,8 +59,8 @@ function PdfFileNameDialog({ value, onChange, onClose, onConfirm, isSaving, clea
             role="switch"
             aria-checked={clearQueue}
             className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 transition-colors duration-200 ${clearQueue
-                ? 'border-[var(--accent)] bg-[var(--accent)]'
-                : 'border-[var(--border)] bg-[var(--bg-card)]'
+              ? 'border-[var(--accent)] bg-[var(--accent)]'
+              : 'border-[var(--border)] bg-[var(--bg-card)]'
               }`}
           >
             <span
@@ -116,8 +116,8 @@ const PdfQueueCard = memo(function PdfQueueCard({
       onDrop={() => onDrop(index)}
       onDragEnd={() => onDrop(index, true)}
       className={`rounded-2xl border bg-[var(--bg-card)] p-3 shadow-[var(--shadow-card)] transition ${isDragging
-          ? 'scale-[0.985] border-[var(--accent)] opacity-80'
-          : 'border-[var(--border)]'
+        ? 'scale-[0.985] border-[var(--accent)] opacity-80'
+        : 'border-[var(--border)]'
         }`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -378,8 +378,18 @@ export default function PdfExport() {
   }
 
   const openNameDialog = () => {
-    const defaultName =
-      pdfFileName.trim() || `secili-sayfalar-${new Date().toISOString().slice(0, 10)}`
+    const now = new Date()
+
+    const timestamp =
+      `${String(now.getDate()).padStart(2, '0')}-` +
+      `${String(now.getMonth() + 1).padStart(2, '0')}-` +
+      `${now.getFullYear()}_` +
+      `${String(now.getHours()).padStart(2, '0')}-` +
+      `${String(now.getMinutes()).padStart(2, '0')}-` +
+      `${String(now.getSeconds()).padStart(2, '0')}`
+
+    const defaultName = `secili-sayfalar-${timestamp}`
+
     setPdfFileName(defaultName)
     setIsNameDialogOpen(true)
   }
@@ -413,27 +423,48 @@ export default function PdfExport() {
         </div>
       </div>
 
-      <div className="inline-flex rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-1">
-        <button
-          type="button"
-          onClick={() => handleTabChange('create')}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === 'create'
+      <div className="flex items-center justify-between gap-4">
+        <div className="inline-flex rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-1">
+          <button
+            type="button"
+            onClick={() => handleTabChange('create')}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === 'create'
               ? 'bg-[var(--accent)] text-white'
               : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}
-        >
-          Oluştur
-        </button>
-        <button
-          type="button"
-          onClick={() => handleTabChange('saved')}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === 'saved'
+              }`}
+          >
+            Oluştur
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('saved')}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === 'saved'
               ? 'bg-[var(--accent)] text-white'
               : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}
-        >
-          Kayıtlı PDF&apos;ler
-        </button>
+              }`}
+          >
+            Kayıtlı PDF&apos;ler
+          </button>
+        </div>
+
+        {activeTab === 'create' ? (
+          <button
+            type="button"
+            onClick={openNameDialog}
+            disabled={items.length === 0}
+            className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            PDF Oluştur
+          </button>
+        ) : (
+          <div className="w-64">
+            <SearchBar
+              value={pdfSearchQuery}
+              onChange={setPdfSearchQuery}
+              placeholder="PDF ara..."
+            />
+          </div>
+        )}
       </div>
 
       {activeTab === 'create' ? (
@@ -462,16 +493,6 @@ export default function PdfExport() {
                 />
               ))}
             </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={openNameDialog}
-                className="rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)]"
-              >
-                PDF Oluştur
-              </button>
-            </div>
           </>
         )
       ) : isLoadingPdfs ? (
@@ -484,14 +505,7 @@ export default function PdfExport() {
           description="Oluşturduğun PDF dosyaları burada listelenecek."
         />
       ) : (
-        <div className="space-y-4">
-          <div className="max-w-md">
-            <SearchBar
-              value={pdfSearchQuery}
-              onChange={setPdfSearchQuery}
-              placeholder="Kayıtlı PDF'ler arasında ara..."
-            />
-          </div>
+        <>
           {filteredSavedPdfs.length === 0 ? (
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-8 text-center text-sm text-[var(--text-muted)]">
               Arama kriterlerine uygun PDF bulunamadı.
@@ -509,7 +523,7 @@ export default function PdfExport() {
               ))}
             </div>
           )}
-        </div>
+        </>
       )}
 
       {viewerItem ? (

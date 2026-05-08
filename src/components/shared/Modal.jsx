@@ -9,6 +9,13 @@ export default function Modal({ title, children, onClose, panelClassName = '', d
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [])
+
   const handleBackdropClick = useCallback(
     (event) => {
       if (disableBackdropClick) return

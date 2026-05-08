@@ -10,6 +10,7 @@ const buildInitialState = (book) => ({
 
 export default function BookForm({ book = null, onClose, onSubmit }) {
   const [formState, setFormState] = useState(() => buildInitialState(book))
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target
@@ -20,12 +21,17 @@ export default function BookForm({ book = null, onClose, onSubmit }) {
   }, [])
 
   const handleSubmit = useCallback(
-    (event) => {
+    async (event) => {
       event.preventDefault()
-      onSubmit({
-        ...formState,
-        total_pages: Number(formState.total_pages) || 0,
-      })
+      setIsSubmitting(true)
+      try {
+        await onSubmit({
+          ...formState,
+          total_pages: Number(formState.total_pages) || 0,
+        })
+      } finally {
+        setIsSubmitting(false)
+      }
     },
     [onSubmit, formState]
   )
@@ -82,9 +88,37 @@ export default function BookForm({ book = null, onClose, onSubmit }) {
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            className="rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm text-white transition hover:bg-[var(--accent-hover)]"
+            disabled={isSubmitting}
+            className="flex min-w-[140px] items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {book ? 'Değişiklikleri Kaydet' : 'Cildi Kaydet'}
+            {isSubmitting ? (
+              <>
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
+                </svg>
+                Kaydediliyor...
+              </>
+            ) : book ? (
+              'Değişiklikleri Kaydet'
+            ) : (
+              'Cildi Kaydet'
+            )}
           </button>
         </div>
       </form>

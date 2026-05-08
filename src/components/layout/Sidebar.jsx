@@ -109,7 +109,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`flex shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-6 transition-[width] duration-300 ${isSidebarCollapsed ? 'w-[72px] px-3' : 'w-72 px-4'
+      className={`sticky top-0 h-screen flex shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-6 transition-[width] duration-300 ${isSidebarCollapsed ? 'w-[72px] px-3' : 'w-72 px-4'
         }`}
     >
       {/* ── Başlık + collapse butonu ── */}

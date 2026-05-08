@@ -103,6 +103,7 @@ export default function Dashboard() {
         variant: 'danger',
         title: 'Güncelleme başarısız',
         message: result.error || 'Cilt bilgileri güncellenemedi.',
+        duration: 6000,
       })
     },
     [bookFormState?.book, updateBook, showToast]

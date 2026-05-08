@@ -311,7 +311,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       const folderPath = result.filePaths[0]
       const files = fs.readdirSync(folderPath)
       const validExts = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
-      
+
       let imageFiles = files
         .filter(f => validExts.includes(path.extname(f).toLowerCase()))
         .map(f => {
@@ -333,18 +333,18 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       const pages = db.prepare('SELECT id, page_number FROM pages WHERE book_id = ? ORDER BY page_number ASC').all(bookId)
 
       if (imageFiles.length !== pages.length) {
-        return { 
-          success: false, 
-          error: `Eşleşme Hatası: Seçilen klasörde ${imageFiles.length} resim bulundu ancak ciltte ${pages.length} sayfa var. Sayıların eşit olması gerekmektedir.` 
+        return {
+          success: false,
+          error: `Eşleşme Hatası: Seçilen klasörde ${imageFiles.length} resim bulundu ancak ciltte ${pages.length} sayfa var. Sayıların eşit olması gerekmektedir.`
         }
       }
 
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i]
         const sourcePath = imageFiles[i].fullPath
-        
-        event.sender.send('images:bulkUploadProgress', { 
-          current: i + 1, 
+
+        event.sender.send('images:bulkUploadProgress', {
+          current: i + 1,
           total: pages.length,
           pageNumber: page.page_number
         })

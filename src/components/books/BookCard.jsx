@@ -5,7 +5,7 @@ export default function BookCard({ book, onSelect, onEdit, onDelete, className =
   const imageCount = book.image_count ?? 0
 
   const formattedDate = book.updated_at
-    ? new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(book.updated_at))
+    ? new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(book.updated_at + ' UTC'))
     : '-'
 
   return (
@@ -40,7 +40,7 @@ export default function BookCard({ book, onSelect, onEdit, onDelete, className =
           </div>
         </div>
         <p className="text-xs text-[var(--text-muted)]">
-          {book.description || 'Açıklama eklenmedi'}
+          {book.description || '-'}
         </p>
         <div className="mt-auto pt-3 flex items-center justify-between text-xs text-[var(--text-muted)]">
           <div className="flex items-center gap-3">
