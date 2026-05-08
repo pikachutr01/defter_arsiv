@@ -358,10 +358,12 @@ export default function BookDetail() {
       label: fromSearch ? 'Aramaya Dön' : 'Geri',
       action: goBack,
       bookName: book?.name || '',
+      bookDescription: book?.description || '',
       isFromSearch: fromSearch,
     })
     return () => clearHeaderBackNav()
-  }, [fromSearch, goBack, book?.name, setHeaderBackNav, clearHeaderBackNav])
+  }, [fromSearch, goBack, book?.name, book?.description, setHeaderBackNav, clearHeaderBackNav])
+
   const openEditForm = useCallback(() => setShowEditForm(true), [])
   const closeEditForm = useCallback(() => setShowEditForm(false), [])
   const openDeleteConfirm = useCallback(() => setShowDeleteConfirm(true), [])

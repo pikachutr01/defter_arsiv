@@ -360,4 +360,82 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       return { success: false, error: error.message }
     }
   })
+
+  // Resmi masaüstüne kopyala
+  // force=false → çakışma varsa conflict döndür, force=true → yeni ad oluşturarak kopyala
+  ipcMain.handle('images:copyToDesktop', async (_event, payload) => {
+    try {
+      const { relativePath, force = false } = typeof payload === 'string'
+        ? { relativePath: payload }
+        : payload
+
+      const storagePath = getStoragePath(db)
+      if (!storagePath) return { success: false, error: 'Depolama yolu bulunamadı.' }
+
+      const sourceAbs = resolveStoragePath(storagePath, relativePath)
+      if (!fs.existsSync(sourceAbs)) {
+        return { success: false, error: 'Kaynak dosya bulunamadı.' }
+      }
+
+      // DB'den cilt adı ve sayfa numarasını çek (image path üzerinden eşleştir)
+      // relativePath posix formatında saklanır, normalize ederek karşılaştır
+      const normalizedRel = relativePath.replace(/\\/g, '/')
+      const pageRow = db
+        .prepare(
+          `SELECT pages.page_number, books.name AS book_name
+           FROM pages
+           JOIN books ON pages.book_id = books.id
+           WHERE REPLACE(pages.image, '\\', '/') = ?`
+        )
+        .get(normalizedRel)
+
+      const ext = path.extname(sourceAbs) || '.jpg'
+
+      // Dosya adı oluştur: Cilt-{bookName}_sayfa-{pageNumber}
+      // Dosya sistemi için güvensiz karakterleri temizle
+      let baseName
+      if (pageRow) {
+        const safeName = pageRow.book_name.replace(/[\\/:*?"<>|]/g, '_').trim()
+        baseName = `Cilt-${safeName}_sayfa-${pageRow.page_number}`
+      } else {
+        // Sayfa bulunamazsa orijinal dosya adını kullan
+        baseName = path.basename(sourceAbs, ext)
+      }
+
+      const { app } = await import('electron')
+      const desktopPath = app.getPath('desktop')
+      const originalDest = path.join(desktopPath, `${baseName}${ext}`)
+
+      // Çakışma var ve kullanıcı henüz onay vermedi
+      if (fs.existsSync(originalDest) && !force) {
+        return { success: false, conflict: true, fileName: `${baseName}${ext}` }
+      }
+
+      // force=true ise numaralı yeni ad üret
+      let destPath = originalDest
+      if (force && fs.existsSync(originalDest)) {
+        let counter = 1
+        do {
+          destPath = path.join(desktopPath, `${baseName}_${counter}${ext}`)
+          counter++
+        } while (fs.existsSync(destPath))
+      }
+
+      fs.copyFileSync(sourceAbs, destPath)
+      return { success: true, destPath }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+
+  // İndirilen resmi varsayılan uygulamada aç
+  ipcMain.handle('images:openFile', async (_event, filePath) => {
+    try {
+      await shell.openPath(filePath)
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
 }

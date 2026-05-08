@@ -30,7 +30,7 @@ export default function Modal({ title, children, onClose, panelClassName = '', d
       onClick={handleBackdropClick}
     >
       <div
-        className={`w-full animate-[fadeInUp_0.4s_ease] rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-soft)] ${panelClassName}`.trim()}
+        className={`relative w-full animate-[fadeInUp_0.4s_ease] rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-soft)] ${panelClassName}`.trim()}
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg">{title}</h3>

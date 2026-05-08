@@ -46,14 +46,19 @@ export default function TopBar() {
           )}
 
           <div className="min-w-0">
-            {/* "Sayfa Durumu" satırı — scroll'da gizlenir */}
+            {/* Üst satır: normal sayfada "Sayfa Durumu", kitap sayfasında açıklama */}
             <p
               className={`text-xs uppercase tracking-[0.3em] text-[var(--text-muted)] transition-all duration-300 overflow-hidden ${
                 scrolled ? 'max-h-0 opacity-0' : 'max-h-6 opacity-100'
               }`}
             >
-              {headerBackNav ? (headerBackNav.bookName || 'Cilt Sayfaları') : 'Sayfa Durumu'}
+              {headerBackNav
+                ? (headerBackNav.bookDescription
+                    ? headerBackNav.bookDescription.slice(0, 50)
+                    : 'Cilt Sayfaları')
+                : 'Sayfa Durumu'}
             </p>
+            {/* Alt satır: normal sayfada uygulama adı, kitap sayfasında kitap adı */}
             <p
               className={`font-serif text-[var(--text-primary)] transition-all duration-300 ${
                 scrolled ? 'text-sm' : 'text-xl'
@@ -62,6 +67,7 @@ export default function TopBar() {
               {headerBackNav ? (headerBackNav.bookName || 'Cilt') : 'Cilt Dijital Kayıt Sistemi'}
             </p>
           </div>
+
         </div>
 
         {/* Sağ taraf — her zaman görünür */}
