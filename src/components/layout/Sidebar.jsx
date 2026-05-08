@@ -1,3 +1,5 @@
+import { useState, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
 import useUiStore from '../../store/useUiStore.js'
 import useBookStore from '../../store/useBookStore.js'
@@ -92,6 +94,32 @@ function Badge({ count, type, collapsed }) {
   )
 }
 
+// ─── Portal Tooltip bileşeni ──────────────────────────────────────────────────
+// document.body'e render edildiğinden hiçbir stacking context sorunu yaşamaz.
+
+function NavTooltip({ label, badgeCount, badgeType, anchorEl }) {
+  if (!anchorEl) return null
+
+  const rect = anchorEl.getBoundingClientRect()
+  const top = rect.top + rect.height / 2
+  const left = rect.right + 12 // 12px boşluk
+
+  return createPortal(
+    <span
+      style={{ top, left, transform: 'translateY(-50%)' }}
+      className="pointer-events-none fixed z-[99999] flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] shadow-[var(--shadow-soft)]"
+    >
+      {label}
+      {badgeCount > 0 && (
+        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${badgeType === 'danger' ? 'bg-[var(--danger)] text-white' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'}`}>
+          {badgeCount}
+        </span>
+      )}
+    </span>,
+    document.body
+  )
+}
+
 // ─── Bileşen ─────────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
@@ -100,12 +128,29 @@ export default function Sidebar() {
   const pdfItemsCount = usePdfQueueStore((state) => state.items.length)
   const booksCount = useBookStore((state) => state.books.length)
 
-  // Her nav öğesi için kaç badge gösterileceğini belirle
+  // Hangi nav öğesinin üzerinde olduğumuzu ve anchor elementini tutuyoruz
+  const [tooltip, setTooltip] = useState({ to: null, el: null })
+  const hoverTimerRef = useRef(null)
+
   const getBadgeCount = (to) => {
     if (to === '/pdf-export') return pdfItemsCount
     if (to === '/') return booksCount
     return 0
   }
+
+  const handleMouseEnter = useCallback((to, el) => {
+    // Collapsed değilse tooltip gösterme
+    if (!isSidebarCollapsed) return
+    clearTimeout(hoverTimerRef.current)
+    setTooltip({ to, el })
+  }, [isSidebarCollapsed])
+
+  const handleMouseLeave = useCallback(() => {
+    // Küçük bir gecikmeyle kapat — ani flickering'i önler
+    hoverTimerRef.current = setTimeout(() => {
+      setTooltip({ to: null, el: null })
+    }, 80)
+  }, [])
 
   return (
     <aside
@@ -114,7 +159,6 @@ export default function Sidebar() {
     >
       {/* ── Başlık + collapse butonu ── */}
       <div className={`mb-10 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between gap-3'}`}>
-        {/* Başlık — collapsed modda gizli */}
         <div className={`min-w-0 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
           <div className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">
             Cilt Dijital Kayıt Sistemi
@@ -124,7 +168,6 @@ export default function Sidebar() {
           </h1>
         </div>
 
-        {/* Collapse butonu */}
         <button
           type="button"
           onClick={toggleSidebar}
@@ -146,6 +189,7 @@ export default function Sidebar() {
       <nav className="flex flex-1 flex-col gap-1">
         {navItems.map((item) => {
           const badgeCount = getBadgeCount(item.to)
+          const isTooltipVisible = isSidebarCollapsed && tooltip.to === item.to
 
           return (
             <NavLink
@@ -153,6 +197,8 @@ export default function Sidebar() {
               to={item.to}
               end={item.to === '/'}
               title={undefined}
+              onMouseEnter={(e) => handleMouseEnter(item.to, e.currentTarget)}
+              onMouseLeave={handleMouseLeave}
               className={({ isActive }) =>
                 `group relative flex items-center rounded-xl transition-all duration-150 ${isSidebarCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-2.5'
                 } ${isActive
@@ -161,7 +207,7 @@ export default function Sidebar() {
                 }`
               }
             >
-              {/* İkon — collapsed modda üstünde badge göster */}
+              {/* İkon */}
               <span className="relative shrink-0">
                 {item.icon}
                 {isSidebarCollapsed && (
@@ -169,28 +215,25 @@ export default function Sidebar() {
                 )}
               </span>
 
-              {/* Etiket — collapsed modda animasyonla gizlenir */}
+              {/* Etiket */}
               <span className={`flex-1 overflow-hidden whitespace-nowrap text-sm transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100'
                 }`}>
                 {item.label}
               </span>
 
-              {/* Satır sağında badge — sadece expanded modda */}
+              {/* Expanded modda sağdaki badge */}
               {!isSidebarCollapsed && (
                 <Badge count={badgeCount} type={item.badgeType} collapsed={false} />
               )}
 
-              {/* Collapsed modda hover tooltip */}
-              {isSidebarCollapsed && (
-                <span className="pointer-events-none absolute left-full z-[99999] ml-3 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] opacity-0 shadow-[var(--shadow-soft)] transition-opacity duration-150 group-hover:opacity-100">
-                  {item.label}
-                  {badgeCount > 0 && (
-                    <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${item.badgeType === 'danger' ? 'bg-[var(--danger)] text-white' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'
-                      }`}>
-                      {badgeCount}
-                    </span>
-                  )}
-                </span>
+              {/* Portal tooltip — collapsed modda, body'e render edilir */}
+              {isTooltipVisible && (
+                <NavTooltip
+                  label={item.label}
+                  badgeCount={badgeCount}
+                  badgeType={item.badgeType}
+                  anchorEl={tooltip.el}
+                />
               )}
             </NavLink>
           )
@@ -199,8 +242,8 @@ export default function Sidebar() {
 
       {/* ── Alt bilgi notu ── */}
       <div className={`mt-10 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] text-xs text-[var(--text-muted)] transition-all duration-300 ${isSidebarCollapsed
-          ? 'pointer-events-none max-h-0 overflow-hidden border-transparent p-0 opacity-0'
-          : 'max-h-40 p-4 opacity-100'
+        ? 'pointer-events-none max-h-0 overflow-hidden border-transparent p-0 opacity-0'
+        : 'max-h-40 p-4 opacity-100'
         }`}>
         Fotoğraf durumunu, arama sonuçlarını ve dışa aktarımları buradan yönetin.
       </div>

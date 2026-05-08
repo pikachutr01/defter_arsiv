@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 
-export default function Modal({ title, children, onClose, panelClassName = '', disableBackdropClick = false }) {
+export default function Modal({ title, children, onClose, panelClassName = '', disableBackdropClick = false, headerActions = null }) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') onClose()
@@ -32,15 +32,18 @@ export default function Modal({ title, children, onClose, panelClassName = '', d
       <div
         className={`relative w-full animate-[fadeInUp_0.4s_ease] rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-soft)] ${panelClassName}`.trim()}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-muted)] transition hover:border-[var(--accent)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
-          >
-            Kapat
-          </button>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-lg flex-1 truncate">{title}</h3>
+          <div className="flex shrink-0 items-center gap-2">
+            {headerActions}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-muted)] transition hover:border-[var(--accent)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+            >
+              Kapat
+            </button>
+          </div>
         </div>
         {children}
       </div>
