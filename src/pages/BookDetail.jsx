@@ -22,6 +22,9 @@ function BulkUploadModal({ onClose, onStart }) {
         <p>
           Seçtiğiniz klasördeki resimler sırasıyla bu cildin sayfalarına eklenecektir.
           <br />
+          <span className="mt-1 block text-[var(--text-muted)]">
+            Sayımda yalnızca desteklenen resim dosyaları dikkate alınır; diğer dosya türleri yok sayılır.
+          </span>
           <span className="text-[var(--danger-text)] font-semibold mt-1 block">
             Dikkat: Varsa mevcut resimlerin üzerine yazılacaktır!
           </span>

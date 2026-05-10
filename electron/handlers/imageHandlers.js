@@ -55,7 +55,19 @@ const getImageQuality = (db) => {
   return row ? parseInt(row.value, 10) : 80
 }
 
+const SUPPORTED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']
+const SUPPORTED_IMAGE_EXTS = new Set(SUPPORTED_IMAGE_EXTENSIONS.map((ext) => `.${ext}`))
 const HEIC_EXTS = new Set(['.heic', '.heif'])
+
+const isSupportedImageFile = (fileName) =>
+  SUPPORTED_IMAGE_EXTS.has(path.extname(fileName).toLowerCase())
+
+const getFileSortTimestamp = (stats) => {
+  const timestamps = [stats.birthtimeMs, stats.mtimeMs].filter(
+    (value) => Number.isFinite(value) && value > 0
+  )
+  return timestamps.length > 0 ? Math.min(...timestamps) : 0
+}
 
 /**
  * HEIC/HEIF kaynak dosyasını JPEG Buffer'a dönüştürür.
@@ -135,7 +147,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openFile'],
-        filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'] }],
+        filters: [{ name: 'Images', extensions: SUPPORTED_IMAGE_EXTENSIONS }],
       })
 
       if (result.canceled || result.filePaths.length === 0) {
@@ -152,7 +164,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openFile'],
-        filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'] }],
+        filters: [{ name: 'Images', extensions: SUPPORTED_IMAGE_EXTENSIONS }],
       })
       if (result.canceled || result.filePaths.length === 0) {
         return { success: false, error: 'Seçim iptal edildi.' }
@@ -309,25 +321,27 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       }
 
       const folderPath = result.filePaths[0]
-      const files = fs.readdirSync(folderPath)
-      const validExts = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
+      const entries = fs.readdirSync(folderPath, { withFileTypes: true })
 
-      let imageFiles = files
-        .filter(f => validExts.includes(path.extname(f).toLowerCase()))
-        .map(f => {
-          const fullPath = path.join(folderPath, f)
+      let imageFiles = entries
+        .filter((entry) => entry.isFile() && isSupportedImageFile(entry.name))
+        .map((entry) => {
+          const fullPath = path.join(folderPath, entry.name)
           const stats = fs.statSync(fullPath)
           return {
-            name: f,
+            name: entry.name,
             fullPath,
-            time: stats.birthtimeMs || stats.mtimeMs
+            time: getFileSortTimestamp(stats),
           }
         })
 
       if (sortMethod === 'date') {
+        // En eski çekim/oluşturma zamanı önce gelsin, sonra sayfalara sırayla yazılsın.
         imageFiles.sort((a, b) => a.time - b.time)
       } else {
-        imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+        imageFiles.sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+        )
       }
 
       const pages = db.prepare('SELECT id, page_number FROM pages WHERE book_id = ? ORDER BY page_number ASC').all(bookId)
@@ -335,7 +349,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       if (imageFiles.length !== pages.length) {
         return {
           success: false,
-          error: `Eşleşme Hatası: Seçilen klasörde ${imageFiles.length} resim bulundu ancak ciltte ${pages.length} sayfa var. Sayıların eşit olması gerekmektedir.`
+          error: `Eşleşme Hatası: Seçilen klasörde desteklenen formatlarda ${imageFiles.length} resim bulundu ancak ciltte ${pages.length} sayfa var. Sadece izin verilen resim dosyaları dikkate alınır ve sayıların eşit olması gerekir.`
         }
       }
 

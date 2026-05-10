@@ -729,6 +729,12 @@ export default function Settings() {
           Cilt Dijital Kayıt Sistemi, cilt fotoğraflarını hızlı ve güvenli
           şekilde yönetmek için tasarlanmıştır.
         </p>
+        <AlertMessage variant="danger" title="Önemli Bilgilendirme" className="mt-4">
+          Bu program tamamen çevrimdışı çalışıp verileri cihazda depolar. Tek
+          görevi depolanan resimleri kolay erişilebilir bir şekilde kullanıcıya
+          sunmaktır. Kullanıcının bilgisi dışında herhangi bir hizmet, servis
+          vb çalıştırmaz.
+        </AlertMessage>
       </div>
 
       {viewerImagePath ? (
