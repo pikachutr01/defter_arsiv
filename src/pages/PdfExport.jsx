@@ -184,7 +184,7 @@ const PdfQueueCard = memo(function PdfQueueCard({
   )
 })
 
-function PdfSavedCard({ item, onOpen, onFind, onDelete }) {
+function PdfSavedCard({ item, onOpen, onFind, onPrint, onDelete }) {
   return (
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-start gap-4">
@@ -232,6 +232,18 @@ function PdfSavedCard({ item, onOpen, onFind, onDelete }) {
           className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
         >
           Bul
+        </button>
+        <button
+          type="button"
+          onClick={onPrint}
+          className="flex items-center justify-center rounded-xl border border-[var(--border)] px-3 py-2 text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          title="Yazdır"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9" />
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
         </button>
         <button
           type="button"
@@ -377,6 +389,17 @@ export default function PdfExport() {
     }
   }
 
+  const handlePrintPdf = async (filePath) => {
+    const result = await ipc.pdfPrint(filePath)
+    if (!result.success) {
+      showToast({
+        variant: 'danger',
+        title: 'Yazdırılamadı',
+        message: result.error || 'PDF yazdırma işlemi başarısız oldu.',
+      })
+    }
+  }
+
   const openNameDialog = () => {
     const now = new Date()
 
@@ -518,6 +541,7 @@ export default function PdfExport() {
                   item={item}
                   onOpen={() => handleOpenPdf(item.filePath)}
                   onFind={() => handleFindPdf(item.filePath)}
+                  onPrint={() => handlePrintPdf(item.filePath)}
                   onDelete={() => setPendingDeletePdf(item)}
                 />
               ))}

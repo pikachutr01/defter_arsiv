@@ -319,4 +319,43 @@ export const registerPdfHandlers = ({ ipcMain, db }) => {
       return { success: false, error: error.message }
     }
   })
+
+  // ── PDF Yazdır ─────────────────────────────────────────────────────────────
+  ipcMain.handle('pdf:print', async (_event, filePath) => {
+    const { BrowserWindow } = await import('electron')
+    try {
+      if (!filePath || !fs.existsSync(filePath)) {
+        return { success: false, error: 'PDF bulunamadı.' }
+      }
+
+      const { pathToFileURL } = await import('url')
+      const fileUrl = pathToFileURL(filePath).toString()
+
+      const printWin = new BrowserWindow({
+        show: false,
+        width: 800,
+        height: 600,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          plugins: true,
+        },
+      })
+
+      await printWin.loadURL(fileUrl)
+      // PDF yüklenmesi için bekleme
+      await new Promise((r) => setTimeout(r, 1000))
+
+      await new Promise((resolve) => {
+        printWin.webContents.print({ silent: false }, (_success, _failureReason) => {
+          resolve()
+        })
+      })
+
+      printWin.destroy()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
 }

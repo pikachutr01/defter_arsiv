@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('images:copyToDesktop', relativePath),
     openFile: (filePath) =>
       ipcRenderer.invoke('images:openFile', filePath),
+    print: (imagePath) =>
+      ipcRenderer.invoke('images:print', imagePath),
     onBulkUploadProgress: (callback) => {
       const listener = (_event, data) => callback(data)
       ipcRenderer.on('images:bulkUploadProgress', listener)
@@ -67,6 +69,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     open: (filePath) => ipcRenderer.invoke('pdf:open', filePath),
     revealInFolder: (filePath) => ipcRenderer.invoke('pdf:revealInFolder', filePath),
     delete: (filePath) => ipcRenderer.invoke('pdf:delete', filePath),
+    print: (filePath) => ipcRenderer.invoke('pdf:print', filePath),
   },
   settings: {
     get: (key) => ipcRenderer.invoke('settings:get', key),

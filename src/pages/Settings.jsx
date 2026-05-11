@@ -38,6 +38,7 @@ export default function Settings() {
   const [status, setStatus] = useState(null)
   const [currentUsername, setCurrentUsername] = useState('')
   const [imageQuality, setImageQuality] = useState(80)
+  const [autoRotate, setAutoRotate] = useState('off')
   const [scanResult, setScanResult] = useState(null)
   const [scanStatus, setScanStatus] = useState(null)
   const [scanError, setScanError] = useState(null)
@@ -96,8 +97,15 @@ export default function Settings() {
         setImageQuality(parseInt(result.data, 10))
       }
     }
+    const loadAutoRotate = async () => {
+      const result = await ipc.settingsGet('upload_auto_rotate')
+      if (isMounted && result.success && result.data) {
+        setAutoRotate(result.data)
+      }
+    }
     loadUsername()
     loadQuality()
+    loadAutoRotate()
     return () => {
       isMounted = false
     }
@@ -219,6 +227,17 @@ export default function Settings() {
     await ipc.settingsSet('image_quality', val)
   }, [])
 
+  const handleAutoRotateToggle = useCallback(async () => {
+    const next = autoRotate === 'off' ? 'left' : 'off'
+    setAutoRotate(next)
+    await ipc.settingsSet('upload_auto_rotate', next)
+  }, [autoRotate])
+
+  const handleAutoRotateDirection = useCallback(async (dir) => {
+    setAutoRotate(dir)
+    await ipc.settingsSet('upload_auto_rotate', dir)
+  }, [])
+
   const handleCredentialFieldChange = useCallback((event) => {
     const { name, value } = event.target
     setCredentials((prev) => ({ ...prev, [name]: value }))
@@ -322,6 +341,65 @@ export default function Settings() {
             <span>Düşük Boyut (%10)</span>
             <span>Yüksek Kalite (%100)</span>
           </div>
+        </div>
+      </div>
+
+      {/* Yükleme Sırasında Otomatik Döndürme */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg">Yükleme Sırasında Otomatik Döndürme</h3>
+            <button
+              type="button"
+              onClick={handleAutoRotateToggle}
+              role="switch"
+              aria-checked={autoRotate !== 'off'}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 transition-colors duration-200 ${autoRotate !== 'off'
+                ? 'border-[var(--accent)] bg-[var(--accent)]'
+                : 'border-[var(--border)] bg-[var(--bg-card)]'
+                }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${autoRotate !== 'off' ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+              />
+            </button>
+          </div>
+          <p className="text-sm text-[var(--text-muted)]">
+            Açık olduğunda, tek tek veya toplu yüklenen tüm resimler otomatik olarak belirlenen yöne döndürülecektir.
+          </p>
+          {autoRotate !== 'off' && (
+            <div className="mt-3 flex gap-3">
+              <button
+                type="button"
+                onClick={() => handleAutoRotateDirection('left')}
+                className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${autoRotate === 'left'
+                  ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
+                  : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)]'
+                  }`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+                Sola Döndür (90°)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAutoRotateDirection('right')}
+                className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${autoRotate === 'right'
+                  ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
+                  : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)]'
+                  }`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 1 0-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                </svg>
+                Sağa Döndür (90°)
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -733,7 +811,8 @@ export default function Settings() {
           Bu program tamamen çevrimdışı çalışıp verileri cihazda depolar. Tek
           görevi depolanan resimleri kolay erişilebilir bir şekilde kullanıcıya
           sunmaktır. Kullanıcının bilgisi dışında herhangi bir hizmet, servis
-          vb çalıştırmaz.
+          vb çalıştırmaz. Programın tüm kodları GitHub'da açık kaynak olarak
+          yayınlanmıştır.
         </AlertMessage>
       </div>
 

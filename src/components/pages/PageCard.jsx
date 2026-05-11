@@ -77,6 +77,7 @@ export default function PageCard({
   onEditNote,
   isPdfSelected,
   isUploading,
+  isRotating,
   isHighlighted,
   onHighlightEnd,
 }) {
@@ -217,11 +218,19 @@ export default function PageCard({
             <>
               <Tooltip label="Sola Döndür">
                 <button type="button" onClick={() => onRotate && onRotate(page.id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                    <path d="M3 3v5h5" />
-                  </svg>
+                  disabled={isRotating}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)] disabled:opacity-50">
+                  {isRotating ? (
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                    </svg>
+                  )}
                 </button>
               </Tooltip>
 
@@ -230,6 +239,17 @@ export default function PageCard({
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                </button>
+              </Tooltip>
+
+              <Tooltip label="Yazdır">
+                <button type="button" onClick={() => ipc.imagesPrint(page.image)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)]">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
                   </svg>
                 </button>
               </Tooltip>

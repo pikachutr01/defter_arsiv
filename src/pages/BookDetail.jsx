@@ -129,6 +129,7 @@ export default function BookDetail() {
   const [pageNoteDraft, setPageNoteDraft] = useState('')
   const [pageToDeleteImage, setPageToDeleteImage] = useState(null)
   const [uploadingPageIds, setUploadingPageIds] = useState(() => new Set())
+  const [rotatingPageIds, setRotatingPageIds] = useState(() => new Set())
   const [highlightedPageId, setHighlightedPageId] = useState(null)
 
   const { showToast } = useToast()
@@ -304,12 +305,17 @@ export default function BookDetail() {
   }, [])
 
   const handleRotateImage = useCallback(async (pageId) => {
-    const result = await ipc.imagesRotate(pageId)
-    if (result.success) {
-      loadPagesByBook(bookId)
-      showToast({ variant: 'success', title: 'Görsel döndürüldü', message: 'Resim sola döndürüldü.' })
-    } else {
-      showToast({ variant: 'danger', title: 'Döndürme başarısız', message: result.error || 'Resim döndürülürken bir hata oluştu.' })
+    setRotatingPageIds((prev) => new Set(prev).add(pageId))
+    try {
+      const result = await ipc.imagesRotate(pageId)
+      if (result.success) {
+        loadPagesByBook(bookId)
+        showToast({ variant: 'success', title: 'Görsel döndürüldü', message: 'Resim sola döndürüldü.' })
+      } else {
+        showToast({ variant: 'danger', title: 'Döndürme başarısız', message: result.error || 'Resim döndürülürken bir hata oluştu.' })
+      }
+    } finally {
+      setRotatingPageIds((prev) => { const next = new Set(prev); next.delete(pageId); return next })
     }
   }, [bookId, loadPagesByBook, showToast])
 
@@ -470,6 +476,7 @@ export default function BookDetail() {
           onEditNote={handleEditNote}
           pdfItems={pdfItems}
           uploadingPageIds={uploadingPageIds}
+          rotatingPageIds={rotatingPageIds}
           virtuosoRef={virtuosoRef}
           highlightedPageId={highlightedPageId}
           onHighlightEnd={() => setHighlightedPageId(null)}
@@ -504,6 +511,9 @@ export default function BookDetail() {
           imagePath={viewingImage.image}
           timestamp={viewingImage.updated_at ? new Date(viewingImage.updated_at).getTime() : null}
           onClose={() => setViewingImage(null)}
+          pages={pages}
+          currentPage={viewingImage}
+          onNavigate={setViewingImage}
         />
       )}
 

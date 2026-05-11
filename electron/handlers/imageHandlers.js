@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
 import heicConvert from 'heic-convert'
-import { dialog, shell } from 'electron'
+import { app, dialog, shell } from 'electron'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -85,25 +85,28 @@ const convertHeicToBuffer = async (sourcePath) => {
   return Buffer.from(outputBuffer)
 }
 
-const optimizeAndSaveImage = async (db, sourcePath, targetPath) => {
-  const quality = getImageQuality(db)
-  const heicBuffer = await convertHeicToBuffer(sourcePath)
-  const sharpInput = heicBuffer ?? sourcePath
-  const instance = sharp(sharpInput, { failOn: 'none' }).rotate()
+/**
+ * Verilen sharp instance'ına alpha-flatten ve JPEG sıkıştırma uygular,
+ * sonucu targetPath'e yazar. quality bir kez dışarıdan geçirilir.
+ */
+const applyJpegPipeline = async (instance, quality, targetPath) => {
   const metadata = await instance.metadata()
-
   const pipeline = metadata.hasAlpha
     ? instance.flatten({ background: '#ffffff' })
     : instance
-
   await pipeline
-    .jpeg({
-      quality,
-      mozjpeg: true,
-      progressive: true,
-      chromaSubsampling: '4:4:4',
-    })
+    .jpeg({ quality, mozjpeg: true, progressive: true, chromaSubsampling: '4:4:4' })
     .toFile(targetPath)
+}
+
+const optimizeAndSaveImage = async (sourcePath, targetPath, quality, autoRotate) => {
+  const heicBuffer = await convertHeicToBuffer(sourcePath)
+  const sharpInput = heicBuffer ?? sourcePath
+  let instance = sharp(sharpInput, { failOn: 'none' }).rotate()
+  // Auto-rotate: sola (-90) veya sağa (+90)
+  if (autoRotate === 'left') instance = instance.rotate(-90)
+  else if (autoRotate === 'right') instance = instance.rotate(90)
+  await applyJpegPipeline(instance, quality, targetPath)
 }
 
 // ─── IPC Handlers ────────────────────────────────────────────────────────────
@@ -114,7 +117,13 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
     'SELECT book_id, page_number FROM pages WHERE id = ?'
   )
 
-  const handleUpload = async (pageId, sourcePath) => {
+  const getAutoRotate = () => {
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'upload_auto_rotate'").get()
+    const val = row?.value
+    return (val === 'left' || val === 'right') ? val : null
+  }
+
+  const handleUpload = async (pageId, sourcePath, quality) => {
     try {
       const storagePath = getStoragePath(db)
       if (!storagePath) {
@@ -129,7 +138,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       const imagePaths = buildImagePaths(storagePath, page.book_id, page.page_number)
 
       ensureDir(imagePaths.baseFolder)
-      await optimizeAndSaveImage(db, sourcePath, imagePaths.originalAbs)
+      await optimizeAndSaveImage(sourcePath, imagePaths.originalAbs, quality ?? getImageQuality(db), getAutoRotate())
       removeIfExists(imagePaths.legacyThumbAbs)
 
       updatePageImage(db, pageId, imagePaths.originalRel, true)
@@ -220,20 +229,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       const quality = getImageQuality(db)
 
       const instance = sharp(imagePaths.originalAbs, { failOn: 'none' }).rotate(-90)
-      const metadata = await instance.metadata()
-
-      const pipeline = metadata.hasAlpha
-        ? instance.flatten({ background: '#ffffff' })
-        : instance
-
-      await pipeline
-        .jpeg({
-          quality: quality,
-          mozjpeg: true,
-          progressive: true,
-          chromaSubsampling: '4:4:4',
-        })
-        .toFile(tempPath)
+      await applyJpegPipeline(instance, quality, tempPath)
 
       fs.unlinkSync(imagePaths.originalAbs)
       fs.renameSync(tempPath, imagePaths.originalAbs)
@@ -344,7 +340,7 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
         )
       }
 
-      const pages = db.prepare('SELECT id, page_number FROM pages WHERE book_id = ? ORDER BY page_number ASC').all(bookId)
+      const pages = db.prepare('SELECT id, page_number, book_id FROM pages WHERE book_id = ? ORDER BY page_number ASC').all(bookId)
 
       if (imageFiles.length !== pages.length) {
         return {
@@ -352,6 +348,14 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
           error: `Eşleşme Hatası: Seçilen klasörde desteklenen formatlarda ${imageFiles.length} resim bulundu ancak ciltte ${pages.length} sayfa var. Sadece izin verilen resim dosyaları dikkate alınır ve sayıların eşit olması gerekir.`
         }
       }
+
+      const storagePath = getStoragePath(db)
+      if (!storagePath) {
+        return { success: false, error: 'Depolama yolu tanımlı değil.' }
+      }
+
+      const quality = getImageQuality(db)
+      const autoRotate = getAutoRotate()
 
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i]
@@ -363,9 +367,15 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
           pageNumber: page.page_number
         })
 
-        const uploadResult = await handleUpload(page.id, sourcePath)
-        if (!uploadResult.success) {
-          return { success: false, error: `Sayfa ${page.page_number} işlenirken hata oluştu: ${uploadResult.error}` }
+        const imagePaths = buildImagePaths(storagePath, page.book_id ?? bookId, page.page_number)
+        ensureDir(imagePaths.baseFolder)
+
+        try {
+          await optimizeAndSaveImage(sourcePath, imagePaths.originalAbs, quality, autoRotate)
+          removeIfExists(imagePaths.legacyThumbAbs)
+          updatePageImage(db, page.id, imagePaths.originalRel, true)
+        } catch (err) {
+          return { success: false, error: `Sayfa ${page.page_number} işlenirken hata oluştu: ${err.message}` }
         }
       }
 
@@ -416,7 +426,6 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
         baseName = path.basename(sourceAbs, ext)
       }
 
-      const { app } = await import('electron')
       const desktopPath = app.getPath('desktop')
       const originalDest = path.join(desktopPath, `${baseName}${ext}`)
 
@@ -449,6 +458,61 @@ export const registerImageHandlers = ({ ipcMain, db }) => {
       await shell.openPath(filePath)
       return { success: true }
     } catch (error) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  // Resmi yazdır – gizli pencere açıp OS yazdırma ekranını tetikler
+  ipcMain.handle('images:print', async (_event, imagePath) => {
+    const { BrowserWindow } = await import('electron')
+    let printWin = null
+    try {
+      const storagePath = getStoragePath(db)
+      if (!storagePath) {
+        return { success: false, error: 'Depolama yolu tanımlı değil.' }
+      }
+
+      const absPath = resolveStoragePath(storagePath, imagePath)
+      if (!fs.existsSync(absPath)) {
+        return { success: false, error: 'Resim bulunamadı.' }
+      }
+
+      // Resmi base64 olarak oku – böylece data:text/html içinde sorunsuz gösterilir
+      const imgBuffer = fs.readFileSync(absPath)
+      const ext = path.extname(absPath).toLowerCase().replace('.', '')
+      const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }
+      const mime = mimeMap[ext] || 'image/jpeg'
+      const base64 = imgBuffer.toString('base64')
+
+      printWin = new BrowserWindow({
+        show: false,
+        width: 800,
+        height: 600,
+        webPreferences: { nodeIntegration: false, contextIsolation: true },
+      })
+
+      const html = `<!DOCTYPE html>
+<html><head><style>
+  @page { margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #fff; }
+  body { display: flex; align-items: center; justify-content: center; }
+  img { max-width: 100%; max-height: 100%; object-fit: contain; }
+</style></head><body><img src="data:${mime};base64,${base64}" /></body></html>`
+
+      await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+
+      await new Promise((resolve) => {
+        printWin.webContents.print({ silent: false }, (_success, _failureReason) => {
+          resolve()
+        })
+      })
+
+      printWin.destroy()
+      printWin = null
+      return { success: true }
+    } catch (error) {
+      if (printWin) printWin.destroy()
       return { success: false, error: error.message }
     }
   })
